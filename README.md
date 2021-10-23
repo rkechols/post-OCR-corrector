@@ -64,4 +64,4 @@ Usage:
 to_images.py [-h] [--n-total N_TOTAL] plain_text_path
 ```
 - `plain_text_path`: the path to the plain text corpus file.
-- `N_TOTAL`: (optional) the number of lines in the plain text corpus file. Used to estimate remaining time before completion.
+- `N_TOTAL`: the number of lines in the plain text corpus file. Used to estimate remaining time before completion.
