@@ -18,14 +18,6 @@ class SrWaC:
             print("WARNING: the files found do not match the expected files", file=sys.stderr)
         self.file_paths = [os.path.join(self.dir_path, file_name) for file_name in found_files]
         self.file_paths.sort()
-        self.n = 0
-        for file_path in self.file_paths:
-            with open(file_path, "r", encoding="utf-8") as file:
-                for line in file:
-                    self.n += len(SENTENCE_OPEN_RE.findall(line))
-
-    def __len__(self) -> int:
-        return self.n
 
     def __iter__(self):
         for file_path in self.file_paths:
