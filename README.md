@@ -39,7 +39,9 @@ sudo apt install tesseract-ocr -y
 ```
 
 
-## List of Scripts
+## Workflow
 
-- `src/corpus/serbian/to_plain_text.py`: Converts the Serbian Corpus (srWaC1.1) from XML format to plain text.  
+The following is an outline of the expected workflow.
+
+1. `src/corpus/serbian/to_plain_text.py`: Converts the Serbian Corpus (srWaC1.1) from XML format to plain text.  
     Takes as a command-line argument the path to the directory of the original srWaC1.1 corpus.
