@@ -41,4 +41,4 @@ sudo apt install tesseract-ocr -y
 
 ## List of Scripts
 
-- `src/train.py`  **TODO**
+- `src/corpus/serbian/to_cyrillic.py`: 
