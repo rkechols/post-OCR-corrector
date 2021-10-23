@@ -4,7 +4,8 @@ from typing import List
 
 from tqdm import tqdm
 
-from corpus.serbian import CORPUS_DIR, DEFAULT_ENCODING
+from corpus import DEFAULT_ENCODING
+from corpus.serbian import CORPUS_DIR
 from corpus.serbian.srwac import NO_SPACE_TAG, SrWaC
 
 

@@ -43,5 +43,25 @@ sudo apt install tesseract-ocr -y
 
 The following is an outline of the expected workflow.
 
-1. `src/corpus/serbian/to_plain_text.py`: Converts the Serbian Corpus (srWaC1.1) from XML format to plain text.  
-    Takes as a command-line argument the path to the directory of the original srWaC1.1 corpus.
+### 1. Generate Training Data
+
+#### 1. XML to Plain Text
+
+`src/corpus/serbian/to_plain_text.py`: Converts the Serbian Corpus (srWaC1.1) from XML format to plain text.
+
+Usage:
+```shell
+to_plain_text.py [-h] srwac_path
+```
+- `srwac_path`: the path to the directory of the original srWaC1.1 corpus.
+
+#### 2. Plain Text to Images
+
+`src/corpus/to_images.py`: Converts a plain text corpus file into a set of image file, one image per line.
+
+Usage:
+```shell
+to_images.py [-h] [--n-total N_TOTAL] plain_text_path
+```
+- `plain_text_path`: the path to the plain text corpus file.
+- `N_TOTAL`: (optional) the number of lines in the plain text corpus file. Used to estimate remaining time before completion.
