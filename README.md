@@ -65,13 +65,4 @@ to_plain_text.py [-h] srwac_path
 ```
 - `srwac_path`: the path to the directory of the original srWaC1.1 corpus.
 
-#### 2. Plain Text to Images
-
-`src/corpus/to_images.py`: Converts a plain text corpus file into a set of image file, one image per line.
-
-Usage:
-```shell
-to_images.py [-h] [--n-total N_TOTAL] plain_text_path
-```
-- `plain_text_path`: the path to the plain text corpus file.
-- `N_TOTAL`: the number of lines in the plain text corpus file. Used to estimate remaining time before completion.
+#### 2. TODO
