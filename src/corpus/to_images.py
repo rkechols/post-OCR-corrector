@@ -79,21 +79,28 @@ def sentence_to_image(index_sentence: Tuple[int, str]):
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("plain_text_path", type=str, help="File path to the plain text file to create images from.")
-    arg_parser.add_argument("--n-total", type=int, default=None, help="Number of sentences being turned into images.")
+    arg_parser.add_argument("--n-total", type=int, default=25636542, help="Number of sentences being turned into images.")
     arg_parser.add_argument("--cpu-limit", type=int, default=(os.cpu_count() - 1), help="Maximum number of CPU cores allowed to use.")
     args = arg_parser.parse_args()
+    plain_text_path = args.plain_text_path
+    n_total = args.n_total
+    cpu_limit = args.cpu_limit
 
-    print(f"Converting lines of {args.plain_text_path} to images...")
+    cpus_available = max(min(os.cpu_count(), cpu_limit), 1)  # the outer max() is in case we get a non-positive number for the CPU limit
+    chunk_size = n_total // (cpus_available * 8)
 
-    with open(args.plain_text_path, "r", encoding=DEFAULT_ENCODING) as corpus_file:
+    print(f"Converting lines of {plain_text_path} to images...")
+
+    with open(plain_text_path, "r", encoding=DEFAULT_ENCODING) as corpus_file:
         sentence_generator = ((i_, line.strip()) for i_, line in enumerate(corpus_file, start=1) if line.strip() != "")
-        cpus_available = max(min(os.cpu_count(), args.cpu_limit), 1)  # the outer max() is in case we get a non-positive number for the CPU limit
         if cpus_available <= 2:  # multiprocessing isn't worth it
-            for tup in tqdm(sentence_generator, total=args.n_total):
+            print("Using 1 CPU core.")
+            for tup in tqdm(sentence_generator, total=n_total):
                 sentence_to_image(tup)
         else:  # cpus_available >= 3
-            with mp.Pool(cpus_available - 1) as pool:
-                for _ in tqdm(pool.imap_unordered(sentence_to_image, sentence_generator), total=args.n_total):
+            print(f"Using {cpus_available} CPU cores (chunk size = {chunk_size}).")
+            with mp.Pool(cpus_available) as pool:
+                for _ in tqdm(pool.imap_unordered(sentence_to_image, sentence_generator, chunksize=chunk_size), total=n_total):
                     pass
 
     print(f"Created images of text in directory {IMAGES_DIR}")
