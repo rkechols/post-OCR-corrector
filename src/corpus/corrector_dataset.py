@@ -12,11 +12,14 @@ from corpus import DEFAULT_ENCODING
 WHITESPACE_RE = re.compile(r"\s+")
 
 
-class OCRDataset(Dataset):
-    def __init__(self, split_csv_path: str, plain_txt_path: str, lang_code: str):
+def mutilate_string(text: str) -> str:
+    pass
+
+
+class CorrectorDataset(Dataset):
+    def __init__(self, split_csv_path: str, plain_txt_path: str):
         self.split_frame = pd.read_csv(split_csv_path)
         self.plain_txt_path = plain_txt_path
-        self.lang_code = lang_code
 
     def __len__(self) -> int:
         return len(self.split_frame)
@@ -32,16 +35,13 @@ class OCRDataset(Dataset):
                     break
                 chars.append(char)
         text_correct = "".join(chars)
-        text_messy = ""
-        for _ in range(len(text_correct)):
-            text_messy += random.choice("abcdefghijklmnopqrstuvwxyz .?!-'*&^%$#@")
-        text_messy = WHITESPACE_RE.sub(" ", text_messy).strip()
+        text_messy = mutilate_string(text_correct)
         return text_messy, text_correct
 
 
 if __name__ == "__main__":
     time_start = time.time()
-    dataset = OCRDataset("data/corpus/serbian/split.csv", "data/corpus/serbian/srWaC-plain.txt", "srp_latn")
+    dataset = CorrectorDataset("data/corpus/serbian/split.csv", "data/corpus/serbian/srWaC-plain.txt")
     time_end = time.time()
     time_diff = time_end - time_start
     print(f"TIME TO LOAD: {time_diff:.2f} seconds")

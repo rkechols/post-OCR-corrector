@@ -30,24 +30,6 @@ Python packages that need to be installed are listed in `requirements.txt` and c
 pip install -r requirements.txt
 ```
 
-### Tesseract OCR
-
-Google's [Tesseract OCR](https://opensource.google/projects/tesseract) needs to be installed.
-One simple way to install is with `apt`:
-```shell
-sudo apt install tesseract-ocr -y
-```
-
-### Fonts Listing
-
-In order to type text into images, a listing of paths to `.ttf` files is needed. On Linux that can be created with these commands:
-```shell
-mkdir -p data
-fc-list | grep ttf > data/fonts.txt
-```
-
-It is recommended that the listed fonts be legible to a normal human, and capable of handling any UTF-8 characters.
-
 
 ## Workflow
 
