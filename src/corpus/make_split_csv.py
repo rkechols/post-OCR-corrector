@@ -1,11 +1,10 @@
+import argparse
 import csv
 import os
 
 from corpus import DEFAULT_ENCODING
-from corpus.serbian.to_plain_text import CORPUS_PLAIN_FILE_PATH
 
 
-CORPUS_SPLIT_CSV = os.path.join(os.path.dirname(CORPUS_PLAIN_FILE_PATH), "split.csv")
 SPLIT_TRAIN = "train"
 SPLIT_VAL = "validation"
 SPLIT_TEST = "test"
@@ -26,8 +25,15 @@ def pick_split(line_num: int) -> str:
 
 
 if __name__ == "__main__":
-    with open(CORPUS_PLAIN_FILE_PATH, "r", encoding=DEFAULT_ENCODING) as corpus_file:
-        with open(CORPUS_SPLIT_CSV, "w", encoding=DEFAULT_ENCODING, newline="") as csv_file:
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("corpus_path", type=str, help="File path to the plain-text file containing the corpus to index and split.")
+    args = arg_parser.parse_args()
+    corpus_path = args.corpus_path
+
+    corpus_split_csv_path = os.path.join(os.path.dirname(corpus_path), "split.csv")
+
+    with open(corpus_path, "r", encoding=DEFAULT_ENCODING) as corpus_file:
+        with open(corpus_split_csv_path, "w", encoding=DEFAULT_ENCODING, newline="") as csv_file:
             csv_writer = csv.writer(csv_file)
             csv_writer.writerow(["byte_index", "split"])
             line_num_ = 1
@@ -51,4 +57,4 @@ if __name__ == "__main__":
                 split_str = pick_split(line_num_)
                 csv_writer.writerow([cursor_value, split_str])
 
-    print(f"Done creating {CORPUS_SPLIT_CSV}")
+    print(f"Done creating {corpus_split_csv_path}")

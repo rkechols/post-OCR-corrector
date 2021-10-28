@@ -53,16 +53,15 @@ It is recommended that the listed fonts be legible to a normal human, and capabl
 
 The following is an outline of the expected workflow.
 
+For help regarding usage for any script, call the script with the `-h` flag:
+```shell
+my_script.py -h
+```
+
 ### 1. Generate Training Data
 
-#### 1. XML to Plain Text
+1. XML to Plain Text: `src/corpus/serbian/to_plain_text.py`  
+    Converts the Serbian Corpus (srWaC1.1) from XML format to plain text.
 
-`src/corpus/serbian/to_plain_text.py`: Converts the Serbian Corpus (srWaC1.1) from XML format to plain text.
-
-Usage:
-```shell
-to_plain_text.py [-h] srwac_path
-```
-- `srwac_path`: the path to the directory of the original srWaC1.1 corpus.
-
-#### 2. TODO
+2. Index and Split Corpus: `src/corpus/make_split_csv.py`  
+    Creates a CSV file with byte-indices (for use with `seek`) for the start of each line, as well as which dataset split (train, validation, test) the line belongs to.
