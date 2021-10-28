@@ -1,13 +1,12 @@
+import random
 import re
 import time
 from typing import Tuple
 
 import pandas as pd
-import pytesseract
 from torch.utils.data import Dataset
 
 from corpus import DEFAULT_ENCODING
-from corpus.to_images import sentence_to_image
 
 
 WHITESPACE_RE = re.compile(r"\s+")
@@ -33,8 +32,9 @@ class OCRDataset(Dataset):
                     break
                 chars.append(char)
         text_correct = "".join(chars)
-        image = sentence_to_image(text_correct)
-        text_messy = pytesseract.image_to_string(image, lang=self.lang_code)
+        text_messy = ""
+        for _ in range(len(text_correct)):
+            text_messy += random.choice("abcdefghijklmnopqrstuvwxyz .?!-'*&^%$#@")
         text_messy = WHITESPACE_RE.sub(" ", text_messy).strip()
         return text_messy, text_correct
 
@@ -57,6 +57,7 @@ if __name__ == "__main__":
     time_end = time.time()
     time_diff = time_end - time_start
     time_per_item = time_diff / n_tests
+    print("SAME COUNT:", same_count)
     print(f"AVG TIME TO LOAD EACH ITEM: {time_per_item:.4f} seconds")
     expected_total = time_per_item * n_total
     print(f"EXPECTED TIME TO LOAD ALL: {expected_total:.2f} seconds")

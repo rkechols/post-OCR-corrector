@@ -43,7 +43,7 @@ def sentence_to_image(sentence: str) -> Image.Image:
     # actually put the text on
     draw.multiline_text((MARGIN_HORIZONTAL, MARGIN_VERTICAL), wrapped_sentence, fill=(text_color, text_color, text_color), font=font)
     # tilt the image a bit
-    image = image.rotate(random.randrange(-3, 4), PIL.Image.BILINEAR, expand=True, fillcolor=HEX_WHITE)
+    image = image.rotate(random.randrange(-2, 3), PIL.Image.BILINEAR, expand=True, fillcolor=HEX_WHITE)
     # add random noise
     noise_level = random.uniform(0, 0.15)
     np_image = np.asarray(image)
