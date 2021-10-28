@@ -55,7 +55,7 @@ The following is an outline of the expected workflow.
 
 For help regarding usage for any script, call the script with the `-h` flag:
 ```shell
-my_script.py -h
+python my_script.py -h
 ```
 
 ### 1. Generate Training Data
