@@ -23,7 +23,7 @@ if __name__ == "__main__":
     all_chars_path = os.path.join(os.path.dirname(corpus_path), "all_chars.txt")
 
     with open(all_chars_path, "w", encoding=DEFAULT_ENCODING) as all_chars_file:
-        for char in all_chars:
+        for char in sorted(all_chars):
             all_chars_file.write(char)
 
     print(f"All chars written to {all_chars_path}")

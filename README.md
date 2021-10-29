@@ -45,5 +45,8 @@ python my_script.py -h
 1. XML to Plain Text: `src/corpus/serbian/to_plain_text.py`  
     Converts the Serbian Corpus (srWaC1.1) from XML format to plain text.
 
-2. Index and Split Corpus: `src/corpus/make_split_csv.py`  
+2. Collect "Vocabulary": `src/corpus/all_chars.py`  
+    Reads the provided corpus and collects a set of all characters present, then prints one copy of each character to a simple text file.
+
+3. Index and Split Corpus: `src/corpus/make_split_csv.py`  
     Creates a CSV file with byte-indices (for use with `seek`) for the start of each line, as well as which dataset split (train, validation, test) the line belongs to.
