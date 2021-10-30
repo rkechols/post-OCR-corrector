@@ -10,6 +10,7 @@ from corpus import DEFAULT_ENCODING
 SPLIT_TRAIN = "train"
 SPLIT_VAL = "validation"
 SPLIT_TEST = "test"
+SPLIT_NAMES = [SPLIT_TRAIN, SPLIT_VAL, SPLIT_TEST]
 
 
 BYTE_INDEX_CLEAN_STR = "byte_index_clean"
