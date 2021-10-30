@@ -1,13 +1,14 @@
+import csv
 import random
 import re
 import time
 from enum import auto, Enum
-from typing import Tuple
+from typing import Literal, Tuple
 
-import pandas as pd
 from torch.utils.data import Dataset
 
 from corpus import DEFAULT_ENCODING
+from corpus.make_split_csv import BYTE_INDEX_STR, SPLIT_CSV_HEADER, SPLIT_STR
 
 
 WHITESPACE_RE = re.compile(r"\s+")
@@ -25,16 +26,22 @@ N_EDIT_TYPES = len(EditType) + 1
 
 
 class CorrectorDataset(Dataset):
-    def __init__(self, split_csv_path: str, plain_txt_path: str, good_chars: str):
-        self.split_frame = pd.read_csv(split_csv_path)
+    def __init__(self, split_csv_path: str, plain_txt_path: str, good_chars: str, split: Literal["train", "validation", "test"]):
+        self.byte_indices = list()
+        with open(split_csv_path, "r", encoding=DEFAULT_ENCODING, newline="") as split_file:
+            csv_reader = csv.DictReader(split_file)
+            assert csv_reader.fieldnames == SPLIT_CSV_HEADER, f"{split_csv_path} had unexpected header: {csv_reader.fieldnames}"
+            for row in csv_reader:
+                if row[SPLIT_STR] == split:
+                    self.byte_indices.append(row[BYTE_INDEX_STR])
         self.plain_txt_path = plain_txt_path
         self.good_chars = good_chars
 
     def __len__(self) -> int:
-        return len(self.split_frame)
+        return len(self.byte_indices)
 
     def __getitem__(self, index: int) -> Tuple[str, str]:
-        byte_index, split = self.split_frame.iloc[index]
+        byte_index = self.byte_indices[index]
         with open(self.plain_txt_path, "r", encoding=DEFAULT_ENCODING) as corpus_file:
             corpus_file.seek(byte_index)
             chars = list()
@@ -91,7 +98,7 @@ if __name__ == "__main__":
     good_chars_ = good_chars_.replace("\n", "")  # \n is never a "good char", but it may be in the file if they put it on multiple lines
 
     time_start = time.time()
-    dataset = CorrectorDataset("data/corpus/serbian/split.csv", "data/corpus/serbian/srWaC-plain.txt", good_chars_)
+    dataset = CorrectorDataset("data/corpus/serbian/split.csv", "data/corpus/serbian/srWaC-plain.txt", good_chars_, split="test")
     time_end = time.time()
 
     time_diff = time_end - time_start

@@ -10,6 +10,11 @@ SPLIT_VAL = "validation"
 SPLIT_TEST = "test"
 
 
+BYTE_INDEX_STR = "byte_index"
+SPLIT_STR = "split"
+SPLIT_CSV_HEADER = [BYTE_INDEX_STR, SPLIT_STR]
+
+
 def pick_split(line_num: int) -> str:
     # last digit of the line number:
     # 1 through 8 -> train
@@ -35,7 +40,7 @@ if __name__ == "__main__":
     with open(corpus_path, "r", encoding=DEFAULT_ENCODING) as corpus_file:
         with open(corpus_split_csv_path, "w", encoding=DEFAULT_ENCODING, newline="") as csv_file:
             csv_writer = csv.writer(csv_file)
-            csv_writer.writerow(["byte_index", "split"])
+            csv_writer.writerow(SPLIT_CSV_HEADER)
             line_num_ = 1
             cursor_value = corpus_file.tell()
             just_saw_newline = False
