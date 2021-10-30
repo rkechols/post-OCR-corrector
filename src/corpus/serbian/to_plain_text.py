@@ -9,7 +9,7 @@ from corpus.serbian import CORPUS_DIR
 from corpus.serbian.srwac import NO_SPACE_TAG, SrWaC
 
 
-CORPUS_PLAIN_FILE_PATH = os.path.join(CORPUS_DIR, "srWaC-plain.txt")
+CORPUS_PLAIN_FILE_PATH = os.path.join(CORPUS_DIR, "corpus-plain.txt")
 
 
 def sentence_to_string(tokens: List[str]) -> str:
