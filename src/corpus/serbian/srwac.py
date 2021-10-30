@@ -5,10 +5,9 @@ import sys
 
 EXPECTED_FILES = {f"srWaC1.1.0{i}.xml" for i in range(1, 7)}
 
-SENTENCE_OPEN_RE = re.compile("<s>")
-SENTENCE_CLOSE_RE = re.compile("</s>")
+SENTENCE_OPEN = "<s>"
+SENTENCE_CLOSE = "</s>"
 NO_SPACE_TAG = "<g/>"
-NO_SPACE_RE = re.compile(NO_SPACE_TAG)
 TOKEN_RE = re.compile(r"(\S+)(?:\s+\S+){3}")
 
 
@@ -28,18 +27,18 @@ class SrWaC:
                 sentence = list()
                 for line_ in file:
                     line = line_.strip()
-                    if SENTENCE_OPEN_RE.fullmatch(line):
+                    if line == SENTENCE_OPEN:
                         if in_sentence:
                             print("WARNING: nested sentence?", file=sys.stderr)
                         in_sentence = True
                         sentence = list()
-                    elif SENTENCE_CLOSE_RE.fullmatch(line):
+                    elif line == SENTENCE_CLOSE:
                         if not in_sentence:
                             print("WARNING: sentence close without open?", file=sys.stderr)
                         in_sentence = False
                         yield sentence
                     elif in_sentence:
-                        if NO_SPACE_RE.fullmatch(line):
+                        if line == NO_SPACE_TAG:
                             sentence.append(NO_SPACE_TAG)
                         else:
                             token_match = TOKEN_RE.fullmatch(line)
