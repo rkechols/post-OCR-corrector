@@ -27,19 +27,38 @@ def sentence_to_string(tokens: List[str]) -> str:
     return " ".join(to_return)
 
 
+def clean_text(text: str, allowed_chars: str) -> str:
+    to_return = list()
+    for char in text:
+        if char in allowed_chars:
+            to_return.append(char)
+        else:
+            if len(to_return) != 0 and not to_return[-1].isspace():
+                to_return.append(" ")
+    return "".join(to_return).strip()
+
+
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("srwac_path", type=str, help="File path to the srWaC directory which contains the 6 XML files.")
+    arg_parser.add_argument("--good-chars-path", type=str, required=True, help="File path to the plain text file which contains the entire set of allowed characters.")
     args = arg_parser.parse_args()
+    srwac_path = args.srwac_path
+    good_chars_path = args.good_chars_path
 
-    print(f"Loading corpus from {args.srwac_path} ...")
-    corpus = SrWaC(args.srwac_path)
+    with open(good_chars_path, "r", encoding=DEFAULT_ENCODING) as good_chars_file:
+        good_chars = good_chars_file.read()
+    good_chars = good_chars.replace("\n", "")
+
+    print(f"Loading corpus from {srwac_path} ...")
+    corpus = SrWaC(srwac_path)
 
     print(f"Converting corpus to plain text...")
     longest = 0
     with open(CORPUS_PLAIN_FILE_PATH, "w", encoding=DEFAULT_ENCODING) as out_file:
         for sentence in tqdm(corpus):
             sentence_str = sentence_to_string(sentence)
+            sentence_str = clean_text(sentence_str, good_chars)
             longest = max(longest, len(sentence_str))
             print(sentence_str, file=out_file)
 
