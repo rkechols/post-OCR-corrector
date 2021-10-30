@@ -12,10 +12,11 @@ class EditType(Enum):
     DELETE = auto()
     CHANGE = auto()
     INSERT = auto()
+    SWAP = auto()
 
 
 EDIT_CHANCE = 0.12
-N_EDIT_TYPES = len(EditType) + 1
+N_EDIT_TYPES = len(EditType)
 INSERT_CHANCE = EDIT_CHANCE / N_EDIT_TYPES
 
 
@@ -24,30 +25,34 @@ def mutilate_string(text: str, good_chars: str) -> str:
     to_return = list()
     i = 0
     while i < n:
-        if random.uniform(0.0, 1.0) <= EDIT_CHANCE:  # yes edit
-            if random.randrange(0, N_EDIT_TYPES) == 0:
-                pass
-            else:
-                edit_type = random.choice(list(EditType))
-                if edit_type == EditType.DELETE:
-                    # just increment the index without copying characters
-                    i += 1
-                elif edit_type == EditType.CHANGE:
-                    # pick a replacement character
-                    new_char = random.choice(good_chars)
-                    to_return.append(new_char)
-                    i += 1  # move past the real one
-                elif edit_type == EditType.INSERT:
-                    # pick a character to add
-                    new_char = random.choice(good_chars)
-                    to_return.append(new_char)
-                    # don't increment `i` so the real char will actually be added
-                # else: UNKNOWN
+        if random.uniform(0.0, 1.0) < EDIT_CHANCE:  # yes edit
+            edit_type = random.choice(list(EditType))
+            if edit_type == EditType.DELETE:
+                # just increment the index without copying characters
+                i += 1
+            elif edit_type == EditType.CHANGE:
+                # pick a replacement character
+                new_char = random.choice(good_chars)
+                to_return.append(new_char)
+                i += 1  # move past the real one
+            elif edit_type == EditType.INSERT:
+                # pick a character to add
+                new_char = random.choice(good_chars)
+                to_return.append(new_char)
+                # don't increment `i` so the real char will actually be added
+            elif edit_type == EditType.SWAP:
+                if i + 1 < n:
+                    to_return.append(text[i + 1])  # second comes first
+                else:  # nothing to actually grab
+                    to_return.append(" ")
+                to_return.append(text[i])
+                i += 2  # we used 2 characters
+            # else: UNKNOWN
         else:  # no edit
             to_return.append(text[i])
             i += 1
     # we could also insert at the end
-    while random.uniform(0.0, 1.0) <= INSERT_CHANCE:
+    while random.uniform(0.0, 1.0) < INSERT_CHANCE:
         # pick a character to add
         new_char = random.choice(good_chars)
         to_return.append(new_char)
