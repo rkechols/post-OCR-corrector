@@ -38,7 +38,7 @@ class CorrectorDataset(Dataset):
             assert csv_reader.fieldnames == SPLIT_CSV_HEADER, f"{split_csv_path} had unexpected header: {csv_reader.fieldnames}"
             for row in csv_reader:
                 if row[SPLIT_STR] == split:
-                    self.byte_indices.append((row[BYTE_INDEX_CLEAN_STR], row[BYTE_INDEX_MESSY_STR]))
+                    self.byte_indices.append((int(row[BYTE_INDEX_CLEAN_STR]), int(row[BYTE_INDEX_MESSY_STR])))
 
     def __len__(self) -> int:
         return len(self.byte_indices)
@@ -51,18 +51,20 @@ class CorrectorDataset(Dataset):
 
 
 if __name__ == "__main__":
+    n_total = 0
     for split_name in SPLIT_NAMES:
         time_start = time.time()
         dataset = CorrectorDataset("data/corpus/srWaC/", split=split_name)
         time_end = time.time()
         time_diff = time_end - time_start
         print(f"Time to load '{split_name}': {time_diff:.2f} seconds")
-        n_total = len(dataset)
-        print("SIZE:", n_total)
+        this_size = len(dataset)
+        n_total += this_size
+        print("SIZE:", this_size)
         print("----------")
+    print("SIZE OF ALL:", n_total)
 
     dataset = CorrectorDataset("data/corpus/srWaC/", split="test")
-    n_total = len(dataset)
 
     same_count = 0
     n_tests = 100
@@ -78,12 +80,12 @@ if __name__ == "__main__":
 
     time_diff = time_end - time_start
     time_per_item = time_diff / n_tests
-    print(f"AVG TIME TO LOAD EACH ITEM: {time_per_item:.4f} seconds")
+    print(f"AVG TIME TO READ EACH ITEM: {time_per_item:.4f} seconds")
     expected_total = time_per_item * n_total
-    print(f"EXPECTED TIME TO LOAD ALL: {expected_total:.2f} seconds")
+    print(f"EXPECTED TIME TO READ ALL: {expected_total:.2f} seconds")
     expected_minutes = expected_total / 60
-    print(f"EXPECTED TIME TO LOAD ALL: {expected_minutes:.2f} minutes")
+    print(f"EXPECTED TIME TO READ ALL: {expected_minutes:.2f} minutes")
     expected_hours = expected_minutes / 60
-    print(f"EXPECTED TIME TO LOAD ALL: {expected_hours:.2f} hours")
+    print(f"EXPECTED TIME TO READ ALL: {expected_hours:.2f} hours")
     expected_days = expected_hours / 24
-    print(f"EXPECTED TIME TO LOAD ALL: {expected_days:.2f} days")
+    print(f"EXPECTED TIME TO READ ALL: {expected_days:.2f} days")
