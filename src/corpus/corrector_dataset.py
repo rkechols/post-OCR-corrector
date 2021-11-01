@@ -1,5 +1,6 @@
 import csv
 import os
+import sys
 import time
 from typing import Literal, Tuple
 
@@ -12,6 +13,7 @@ from util.data_functions import get_line
 
 class CorrectorDataset(Dataset):
     def __init__(self, data_dir: str, split: Literal["train", "validation", "test"]):
+        print(f"Loading {self.__class__.__name__}, split='{split}'", file=sys.stderr)
         self.clean_corpus_path = os.path.join(data_dir, CORPUS_PLAIN_FILE_NAME)
         self.messy_corpus_path = os.path.join(data_dir, CORPUS_MESSY_FILE_NAME)
         split_csv_path = os.path.join(data_dir, SPLIT_FILE_NAME)
