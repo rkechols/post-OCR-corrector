@@ -62,3 +62,11 @@ python my_script.py -h
     Create a CSV file with byte-indices (for use with `seek`) for the start of each line of the plain-text corpus and for
     the corresponding line of the messy corpus. Also decides and records which dataset split (train, validation, test)
     the line belongs to.
+
+### 2. Train Baseline Model
+
+1. Train a Baseline: `src/baselines/dictionary_corrector.py`  
+    Train a basic dictionary-based corrector that corrects unknown words by replacing them with the nearest known word
+    ("nearest" measured by Damerau-Levenshtein distance).
+
+**TODO**

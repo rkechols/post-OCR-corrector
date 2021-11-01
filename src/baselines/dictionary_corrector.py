@@ -1,4 +1,5 @@
 import csv
+import argparse
 import json
 import math
 import os
@@ -137,7 +138,11 @@ class DictionaryCorrector:
 
 
 if __name__ == "__main__":
-    corpus_dir = os.path.join("data", "corpus", "srWaC")
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("corpus_dir", type=str, help="File path to the directory containing the corpus to train on.")
+    args = arg_parser.parse_args()
+    corpus_dir = args.corpus_dir
+
     models_dir = os.path.join("data", "models", "dictionary_corrector")
 
     # get good chars
