@@ -138,7 +138,7 @@ if __name__ == "__main__":
     best_model_path = None
 
     # estimate a min_freq value that will give us just the top 1000 words
-    freq_for_top_1000 = max(corrector.vocabulary.keys()) / 1000
+    freq_for_top_1000 = max(corrector.vocabulary.values()) / 1000
 
     try:
         for power in range(math.ceil(math.log2(freq_for_top_1000))):
