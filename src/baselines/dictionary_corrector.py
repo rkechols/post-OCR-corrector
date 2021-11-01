@@ -2,19 +2,21 @@ import csv
 import json
 import os
 import sys
-import time
+from typing import Literal, Tuple
 
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from corpus import CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, SPLIT_FILE_NAME
-from corpus.make_split_csv import BYTE_INDEX_CLEAN_STR, SPLIT_CSV_HEADER, SPLIT_STR, SPLIT_TEST
+from corpus.corrector_dataset import CorrectorDataset
+from corpus.make_split_csv import BYTE_INDEX_CLEAN_STR, SPLIT_CSV_HEADER, SPLIT_STR
 from util.data_functions import get_line
 from util.edit_distance import edit_distance
 
 
 class DictionaryCorrectorDataset(Dataset):
-    def __init__(self, data_dir: str, test: bool = False):
+    def __init__(self, data_dir: str, split: Literal["train", "validation", "test"]):
+        print(f"Loading {self.__class__.__name__}, split='{split}'", file=sys.stderr)
         self.clean_corpus_path = os.path.join(data_dir, CORPUS_PLAIN_FILE_NAME)
         split_csv_path = os.path.join(data_dir, SPLIT_FILE_NAME)
         self.byte_indices = list()
@@ -22,7 +24,7 @@ class DictionaryCorrectorDataset(Dataset):
             csv_reader = csv.DictReader(split_file)
             assert csv_reader.fieldnames == SPLIT_CSV_HEADER, f"{split_csv_path} had unexpected header: {csv_reader.fieldnames}"
             for row in csv_reader:
-                if (row[SPLIT_STR] == SPLIT_TEST) == test:
+                if row[SPLIT_STR] == split:
                     self.byte_indices.append(int(row[BYTE_INDEX_CLEAN_STR]))
 
     def __len__(self) -> int:
@@ -86,15 +88,32 @@ class DictionaryCorrector:
                 to_return.append(best_token)
         return " ".join(to_return)
 
+    def evaluate(self, dataset: CorrectorDataset) -> Tuple[float, float]:
+        print(f"{self.__class__.__name__} evaluating...", file=sys.stderr)
+        n = len(dataset)
+        distance_total = 0
+        n_perfect = 0
+        for i in tqdm(range(n)):
+            text_messy, text_clean = dataset[i]
+            text_out = self(text_messy)
+            if text_out == text_clean:  # nailed it
+                n_perfect += 1
+            else:  # measure how far off it was
+                distance = edit_distance(text_out, text_clean)
+                distance_norm = distance / len(text_clean)
+                distance_total += distance_norm
+        avg_distance = distance_total / n
+        return avg_distance, n_perfect / n
+
     def save(self, file_path: str):
-        print(f"Saving {self.__class__.__name__} to file {file_path}...", file=sys.stderr)
+        print(f"Saving {self.__class__.__name__} to file {file_path}", file=sys.stderr)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         with open(file_path, "w", encoding=DEFAULT_ENCODING) as file:
             print(json.dumps(self.__dict__, indent=2), file=file)
 
     @classmethod
     def load(cls, file_path: str):  # -> DictionaryCorrector:
-        print(f"Loading {cls.__name__} from file {file_path}...", file=sys.stderr)
+        print(f"Loading {cls.__name__} from file {file_path}", file=sys.stderr)
         with open(file_path, "r", encoding=DEFAULT_ENCODING) as file:
             json_obj = json.loads(file.read())
         assert isinstance(json_obj, dict), f"root json type needs to be a dict"
@@ -105,25 +124,45 @@ class DictionaryCorrector:
 
 
 if __name__ == "__main__":
+    corpus_dir = os.path.join("data", "corpus", "srWaC")
     models_dir = os.path.join("data", "models", "dictionary_corrector")
 
-    print("Loading dataset...", file=sys.stderr)
-    dataset = DictionaryCorrectorDataset(os.path.join("data", "corpus", "srWaC"))
+    dataset_train = DictionaryCorrectorDataset(corpus_dir, split="train")
     corrector = DictionaryCorrector(min_frequency=1)
-    corrector.train(dataset)
+    corrector.train(dataset_train)
 
-    test_sentence = "Ov mi jee najbola stfar."
+    dataset_val = CorrectorDataset(corpus_dir, split="validation")
 
-    for min_freq in [1, 2, 5, 10, 15, 30, 50]:
-        print("----------")
-        print(f"min_frequency = {min_freq}")
-        corrector.min_frequency = min_freq
-        corrector.prune()
-        corrector.save(os.path.join(models_dir, f"dictionary_corrector-min_{min_freq:02d}.json"))
-        print(f"Sentence in: {test_sentence}")
-        time_start = time.time()
-        out_sentence = corrector(test_sentence)
-        time_end = time.time()
-        print(f"Sentence out: {out_sentence}")
-        print(f"Time elapsed: {time_end - time_start:.2f} seconds")
+    best_model_avg = None
+    best_model_path = None
 
+    try:
+        for power in range(15):
+            min_freq = 2 ** power
+            print("----------")
+            print(f"min_frequency = {min_freq}")
+            corrector.min_frequency = min_freq
+            corrector.prune()
+            this_model_path = os.path.join(models_dir, f"dictionary_corrector-min_{min_freq:04d}.json")
+            corrector.save(this_model_path)
+            print("Evaluating on validation set...")
+            average_distance, percent_perfect = corrector.evaluate(dataset_val)
+            print(f"Average edit distance: {average_distance:.2f}")
+            print(f"Percent perfect: {100 * percent_perfect:.2f}%")
+            if best_model_avg is None or average_distance < best_model_avg:
+                print("(Best model so far!)")
+                best_model_avg = average_distance
+                best_model_path = this_model_path
+    except KeyboardInterrupt as e:
+        if best_model_path is None:
+            raise e
+        print("\nINTERRUPTED - skipping to final evaluation on 'test' set\n", file=sys.stderr)
+
+    print("----------")
+    print(f"Loading best model: {best_model_path}")
+    corrector = DictionaryCorrector.load(best_model_path)
+    print("Evaluating on test set...")
+    dataset_test = CorrectorDataset(corpus_dir, split="test")
+    average_distance, percent_perfect = corrector.evaluate(dataset_val)
+    print(f"Average edit distance: {average_distance:.2f}")
+    print(f"Percent perfect: {100 * percent_perfect:.2f}%")
