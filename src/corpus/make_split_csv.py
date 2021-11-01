@@ -4,7 +4,7 @@ import os
 
 from tqdm import tqdm
 
-from corpus import DEFAULT_ENCODING
+from corpus import CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, SPLIT_FILE_NAME
 
 
 SPLIT_TRAIN = "train"
@@ -52,16 +52,17 @@ def line_byte_indices(file):
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument("--corpus-clean", type=str, required=True, help="File path to the plain-text file containing the clean version of the corpus.")
-    arg_parser.add_argument("--corpus-messy", type=str, required=True, help="File path to the plain-text file containing the messy version of the corpus.")
+    arg_parser.add_argument("corpus_dir", type=str, help="File path to the directory containing the corpus to index and split.")
     args = arg_parser.parse_args()
-    corpus_clean_path = args.corpus_clean
-    corpus_messy_path = args.corpus_messy
+    corpus_dir = args.corpus_dir
+
+    corpus_clean_path = os.path.join(corpus_dir, CORPUS_PLAIN_FILE_NAME)
+    corpus_messy_path = os.path.join(corpus_dir, CORPUS_MESSY_FILE_NAME)
 
     print(f"Clean corpus file: {corpus_clean_path}")
     print(f"Messy corpus file: {corpus_messy_path}")
 
-    corpus_split_csv_path = os.path.join(os.path.dirname(corpus_clean_path), "split.csv")
+    corpus_split_csv_path = os.path.join(corpus_dir, SPLIT_FILE_NAME)
 
     print(f"Indexing corpus files and determining train/val/test splits...")
 

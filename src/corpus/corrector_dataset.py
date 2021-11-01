@@ -5,7 +5,7 @@ from typing import Literal, Tuple
 
 from torch.utils.data import Dataset
 
-from corpus import DEFAULT_ENCODING
+from corpus import CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, SPLIT_FILE_NAME
 from corpus.make_split_csv import BYTE_INDEX_CLEAN_STR, BYTE_INDEX_MESSY_STR, SPLIT_CSV_HEADER, SPLIT_NAMES, SPLIT_STR
 
 
@@ -29,9 +29,9 @@ def get_line(file_path: str, byte_index: int) -> str:
 
 class CorrectorDataset(Dataset):
     def __init__(self, data_dir: str, split: Literal["train", "validation", "test"]):
-        self.clean_corpus_path = os.path.join(data_dir, "corpus-plain.txt")
-        self.messy_corpus_path = os.path.join(data_dir, "corpus-messy.txt")
-        split_csv_path = os.path.join(data_dir, "split.csv")
+        self.clean_corpus_path = os.path.join(data_dir, CORPUS_PLAIN_FILE_NAME)
+        self.messy_corpus_path = os.path.join(data_dir, CORPUS_MESSY_FILE_NAME)
+        split_csv_path = os.path.join(data_dir, SPLIT_FILE_NAME)
         self.byte_indices = list()
         with open(split_csv_path, "r", encoding=DEFAULT_ENCODING, newline="") as split_file:
             csv_reader = csv.DictReader(split_file)

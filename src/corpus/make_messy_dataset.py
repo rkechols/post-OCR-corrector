@@ -5,7 +5,7 @@ from enum import auto, Enum
 
 from tqdm import tqdm
 
-from corpus import DEFAULT_ENCODING
+from corpus import CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, GOOD_CHARS_FILE_NAME
 
 
 class EditType(Enum):
@@ -62,11 +62,12 @@ def mutilate_string(text: str, good_chars: str) -> str:
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument("corpus_path", type=str, help="File path to the plain-text file containing the corpus to make a messy version of.")
-    arg_parser.add_argument("--good-chars-path", type=str, required=True, help="File path to the text file containing the 'good'/'standard' characters of the corpus.")
+    arg_parser.add_argument("corpus_dir", type=str, help="File path to the directory containing the corpus to make a messy version of.")
     args = arg_parser.parse_args()
-    corpus_path = args.corpus_path
-    good_chars_path = args.good_chars_path
+    corpus_dir = args.corpus_dir
+
+    corpus_path = os.path.join(corpus_dir, CORPUS_PLAIN_FILE_NAME)
+    good_chars_path = os.path.join(corpus_dir, GOOD_CHARS_FILE_NAME)
 
     with open(good_chars_path, "r", encoding=DEFAULT_ENCODING) as good_chars_file:
         good_chars_ = good_chars_file.read()
@@ -74,7 +75,7 @@ if __name__ == "__main__":
 
     print(f"Creating a mutilated/messy version of {corpus_path}")
 
-    messy_path = os.path.join(os.path.dirname(corpus_path), "corpus-messy.txt")
+    messy_path = os.path.join(corpus_dir, CORPUS_MESSY_FILE_NAME)
 
     with open(corpus_path, "r", encoding=DEFAULT_ENCODING) as corpus_file:
         with open(messy_path, "w", encoding=DEFAULT_ENCODING) as messy_file:

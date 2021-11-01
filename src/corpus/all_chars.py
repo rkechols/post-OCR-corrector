@@ -1,15 +1,16 @@
 import argparse
 import os
 
-from corpus import DEFAULT_ENCODING
+from corpus import ALL_CHARS_FILE_NAME, CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING
 
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument("corpus_path", type=str, help="File path to the plain-text file containing the corpus to index and split.")
+    arg_parser.add_argument("corpus_dir", type=str, help="File path to the directory containing the corpus to collect chars from.")
     args = arg_parser.parse_args()
-    corpus_path = args.corpus_path
+    corpus_dir = args.corpus_dir
 
+    corpus_path = os.path.join(corpus_dir, CORPUS_PLAIN_FILE_NAME)
     print(f"Collecting chars from {corpus_path}")
 
     all_chars = set()
@@ -20,7 +21,7 @@ if __name__ == "__main__":
                 break
             all_chars.add(char)
 
-    all_chars_path = os.path.join(os.path.dirname(corpus_path), "all_chars.txt")
+    all_chars_path = os.path.join(corpus_dir, ALL_CHARS_FILE_NAME)
 
     with open(all_chars_path, "w", encoding=DEFAULT_ENCODING) as all_chars_file:
         for char in sorted(all_chars):

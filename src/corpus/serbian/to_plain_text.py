@@ -4,12 +4,12 @@ from typing import List
 
 from tqdm import tqdm
 
-from corpus import DEFAULT_ENCODING
+from corpus import CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING
 from corpus.serbian import CORPUS_DIR
 from corpus.serbian.srwac import NO_SPACE_TAG, SrWaC
 
 
-CORPUS_PLAIN_FILE_PATH = os.path.join(CORPUS_DIR, "corpus-plain.txt")
+CORPUS_PLAIN_FILE_PATH = os.path.join(CORPUS_DIR, CORPUS_PLAIN_FILE_NAME)
 
 
 def sentence_to_string(tokens: List[str]) -> str:
