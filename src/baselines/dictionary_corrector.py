@@ -1,18 +1,23 @@
 import csv
-import math
 import json
+import math
 import os
+import re
+import string
 import sys
 from typing import Literal, Tuple
 
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from corpus import CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, SPLIT_FILE_NAME
+from corpus import CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, GOOD_CHARS_FILE_NAME, SPLIT_FILE_NAME
 from corpus.corrector_dataset import CorrectorDataset
 from corpus.make_split_csv import BYTE_INDEX_CLEAN_STR, SPLIT_CSV_HEADER, SPLIT_STR
 from util.data_functions import get_line
-from util.edit_distance import edit_distance
+from util.edit_distance import edit_distance, generate_edits
+
+
+WHITESPACE_RE = re.compile(r"\s")
 
 
 class DictionaryCorrectorDataset(Dataset):
@@ -38,8 +43,9 @@ class DictionaryCorrectorDataset(Dataset):
 
 
 class DictionaryCorrector:
-    def __init__(self, min_frequency: int = 2):
+    def __init__(self, min_frequency: int = 2, good_chars: str = string.ascii_lowercase + string.ascii_uppercase):
         self.min_frequency = min_frequency
+        self.good_chars = WHITESPACE_RE.sub("", good_chars)
         self.vocabulary = dict()
 
     def train(self, data: DictionaryCorrectorDataset):
@@ -66,27 +72,33 @@ class DictionaryCorrector:
         for token in tqdm(to_prune):
             del self.vocabulary[token]
 
+    def _in_vocab(self, token: str) -> bool:
+        # don't count words below the minimum frequency
+        return token in self.vocabulary and self.vocabulary[token] > self.min_frequency
+
+    def _find_nearest_valid(self, raw_token: str) -> str:
+        tried = set()
+        layer = {raw_token}
+        while True:
+            next_layer = set()
+            for token in layer:
+                for edited_token in generate_edits(token, self.good_chars):
+                    if self._in_vocab(edited_token):
+                        return edited_token
+                    if edited_token in tried:
+                        continue  # lots of different ways to get to the same string; if we've seen it before, don't put it in the next layer
+                    tried.add(edited_token)
+                    next_layer.add(edited_token)
+            layer = next_layer
+
     def __call__(self, to_correct: str) -> str:  # inference
+        assert len(self.vocabulary) > 0, "cannot correct text without first training the model"
         to_return = list()
         for raw_token in to_correct.strip().split():  # split by whitespace
-            raw_token_size = len(raw_token)
-            if raw_token in self.vocabulary and self.vocabulary[raw_token] >= self.min_frequency:  # it's in our vocab; no edit
+            if self._in_vocab(raw_token):
                 to_return.append(raw_token)
-            else:  # not recognized; find the word that's closest by edit distance
-                best_token = None
-                best_score = None
-                best_frequency = None
-                for real_token, frequency in self.vocabulary.items():
-                    if frequency < self.min_frequency:
-                        continue  # this word happens so rarely we won't count it as being in the vocabulary
-                    if best_score is not None and abs(len(real_token) - raw_token_size) > best_score:
-                        continue  # not possible to get a better edit score from this word; too many letters need to be added or deleted just to match the length
-                    score = edit_distance(raw_token, real_token)
-                    if best_score is None or score < best_score or (score == best_score and frequency > best_frequency):  # use frequency to break ties on edit distance
-                        best_token = real_token
-                        best_score = score
-                        best_frequency = frequency
-                to_return.append(best_token)
+                continue
+            to_return.append(self._find_nearest_valid(raw_token))
         return " ".join(to_return)
 
     def evaluate(self, dataset: CorrectorDataset) -> Tuple[float, float]:
@@ -128,8 +140,12 @@ if __name__ == "__main__":
     corpus_dir = os.path.join("data", "corpus", "srWaC")
     models_dir = os.path.join("data", "models", "dictionary_corrector")
 
+    # get good chars
+    with open(os.path.join(corpus_dir, GOOD_CHARS_FILE_NAME), "r", encoding=DEFAULT_ENCODING) as chars_file:
+        good_chars_ = chars_file.read().replace("\n", "")  # these chars will be used to generate edits
+
     dataset_train = DictionaryCorrectorDataset(corpus_dir, split="train")
-    corrector = DictionaryCorrector(min_frequency=1)
+    corrector = DictionaryCorrector(min_frequency=1, good_chars=good_chars_)
     corrector.train(dataset_train)
 
     dataset_val = CorrectorDataset(corpus_dir, split="validation")
