@@ -76,7 +76,7 @@ if __name__ == "__main__":
             same_count += 1
     time_end = time.time()
 
-    print("SAME COUNT:", same_count, f"(of {n_tests})")
+    print("SAME COUNT:", same_count, f"(from sample of {n_tests})")
 
     time_diff = time_end - time_start
     time_per_item = time_diff / n_tests
