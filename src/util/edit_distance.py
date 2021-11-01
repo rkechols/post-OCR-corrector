@@ -56,20 +56,3 @@ def edit_distance(s1: str, s2: str) -> int:
             scores[i, j] = min(score_options)
 
     return scores[-1, -1]
-
-
-def generate_edits(to_edit: str, good_chars: str):  # -> string generator
-    n = len(to_edit)
-    for i in range(n):  # try deleting each char
-        yield to_edit[:i] + to_edit[(i + 1):]
-    for i in range(n - 1):  # try swapping each adjacent pair
-        yield to_edit[:i] + to_edit[i + 1] + to_edit[i] + to_edit[(i + 2):]
-    for i in range(n):  # try changing each char to a different one
-        this_char = to_edit[i]
-        for char in good_chars:
-            if char == this_char:
-                continue  # don't swap a char for itself
-            yield to_edit[:i] + char + to_edit[(i + 1):]
-    for i in range(n + 1):  # try inserting a char
-        for char in good_chars:
-            yield to_edit[:i] + char + to_edit[i:]
