@@ -87,7 +87,7 @@ class DictionaryCorrector:
                 best_token = None
                 best_score = None
                 best_frequency = None
-                for real_token, frequency in sorted(self.vocabulary.items(), key=lambda x: abs(len(x[1] - raw_token_size))):
+                for real_token, frequency in sorted(self.vocabulary.items(), key=lambda x: abs(len(x[1]) - raw_token_size)):
                     if best_score is not None and abs(len(real_token) - raw_token_size) > best_score:
                         break  # not possible to get a better edit score from this word; too many letters need to be added or deleted just to match the length
                     if frequency < self.min_frequency:
