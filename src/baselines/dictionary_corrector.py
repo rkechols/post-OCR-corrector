@@ -45,7 +45,7 @@ class DictionaryCorrectorDataset(Dataset):
 class DictionaryCorrector:
     def __init__(self, min_frequency: int = 2, good_chars: str = string.ascii_lowercase + string.ascii_uppercase):
         self.min_frequency = min_frequency
-        self.good_chars = WHITESPACE_RE.sub("", good_chars)
+        self._good_chars = WHITESPACE_RE.sub("", good_chars)
         self.vocabulary = dict()
 
     def train(self, data: DictionaryCorrectorDataset):
@@ -82,7 +82,7 @@ class DictionaryCorrector:
         while True:
             next_layer = set()
             for token in layer:
-                for edited_token in generate_edits(token, self.good_chars):
+                for edited_token in generate_edits(token, self._good_chars):
                     if self._in_vocab(edited_token):
                         return edited_token
                     if edited_token in tried:
