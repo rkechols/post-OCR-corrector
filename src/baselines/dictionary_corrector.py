@@ -88,6 +88,7 @@ class DictionaryCorrector:
 
     def save(self, file_path: str):
         print(f"Saving {self.__class__.__name__} to file {file_path}...", file=sys.stderr)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         with open(file_path, "w", encoding=DEFAULT_ENCODING) as file:
             print(json.dumps(self.__dict__, indent=2), file=file)
 
@@ -104,33 +105,25 @@ class DictionaryCorrector:
 
 
 if __name__ == "__main__":
-    # dataset = DictionaryCorrectorDataset("data/corpus/srWaC", test=True)
-    # corrector = DictionaryCorrector()
-    # corrector.train(dataset)
-    #
-    # print("Sentence in:")
-    # test_sentence = "Ov mi je najbola stvar."
-    # print(test_sentence)
-    #
-    # print("Sentence out:")
-    # out_sentence = corrector(test_sentence)
-    # print(out_sentence)
-    #
-    # corrector.save("data/base_corrector.json")
-    # del corrector
+    models_dir = os.path.join("data", "models", "dictionary_corrector")
 
-    corrector = DictionaryCorrector.load("data/base_corrector.json")
-    # corrector.prune()
-    corrector.min_frequency = 1
-    del corrector.vocabulary["najbola"]  # hax so we get the full run time
+    print("Loading dataset...", file=sys.stderr)
+    dataset = DictionaryCorrectorDataset(os.path.join("data", "corpus", "srWaC"))
+    corrector = DictionaryCorrector(min_frequency=1)
+    corrector.train(dataset)
 
-    test_sentence = "Ov mi je najbola stvar."
-    print("Sentence in:")
-    print(test_sentence)
+    test_sentence = "Ov mi jee najbola stfar."
 
-    time_start = time.time()
-    out_sentence = corrector(test_sentence)
-    time_end = time.time()
-    print("Sentence out:")
-    print(out_sentence)
-    print(f"Time elapsed: {time_end - time_start:.2f} seconds")
+    for min_freq in [1, 2, 5, 10, 15, 30, 50]:
+        print("----------")
+        print(f"min_frequency = {min_freq}")
+        corrector.min_frequency = min_freq
+        corrector.prune()
+        corrector.save(os.path.join(models_dir, f"dictionary_corrector-min_{min_freq:02d}.json"))
+        print(f"Sentence in: {test_sentence}")
+        time_start = time.time()
+        out_sentence = corrector(test_sentence)
+        time_end = time.time()
+        print(f"Sentence out: {out_sentence}")
+        print(f"Time elapsed: {time_end - time_start:.2f} seconds")
+
