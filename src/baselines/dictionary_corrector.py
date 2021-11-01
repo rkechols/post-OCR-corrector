@@ -1,4 +1,5 @@
 import csv
+import math
 import json
 import os
 import sys
@@ -136,14 +137,17 @@ if __name__ == "__main__":
     best_model_avg = None
     best_model_path = None
 
+    # estimate a min_freq value that will give us just the top 1000 words
+    freq_for_top_1000 = max(corrector.vocabulary.keys()) / 1000
+
     try:
-        for power in range(15):
+        for power in range(math.ceil(math.log2(freq_for_top_1000))):
             min_freq = 2 ** power
             print("----------")
             print(f"min_frequency = {min_freq}")
             corrector.min_frequency = min_freq
             corrector.prune()
-            this_model_path = os.path.join(models_dir, f"dictionary_corrector-min_{min_freq:04d}.json")
+            this_model_path = os.path.join(models_dir, f"dictionary_corrector-min_{min_freq}.json")
             corrector.save(this_model_path)
             print("Evaluating on validation set...")
             average_distance, percent_perfect = corrector.evaluate(dataset_val)
