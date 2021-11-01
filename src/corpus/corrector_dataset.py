@@ -7,24 +7,7 @@ from torch.utils.data import Dataset
 
 from corpus import CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, SPLIT_FILE_NAME
 from corpus.make_split_csv import BYTE_INDEX_CLEAN_STR, BYTE_INDEX_MESSY_STR, SPLIT_CSV_HEADER, SPLIT_NAMES, SPLIT_STR
-
-
-def get_line(file_path: str, byte_index: int) -> str:
-    chars = list()
-    with open(file_path, "r", encoding=DEFAULT_ENCODING) as file:
-        file.seek(byte_index)
-        while True:  # read to the end of the line
-            char = file.read(1)
-            if char == "" or char == "\n":
-                break
-            if char.isspace():  # collapse all blocks of whitespace to a single space
-                if len(chars) == 0 or chars[-1].isspace():
-                    continue  # don't start with whitespace or put one space after another
-                else:
-                    chars.append(" ")
-            else:  # not whitespace; act normal
-                chars.append(char)
-    return "".join(chars)
+from util.data_functions import get_line
 
 
 class CorrectorDataset(Dataset):
