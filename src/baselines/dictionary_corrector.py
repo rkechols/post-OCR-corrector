@@ -2,6 +2,7 @@ import argparse
 import csv
 import json
 import math
+import multiprocessing as mp
 import os
 import re
 import string
@@ -15,7 +16,7 @@ from corpus import CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, GOOD_CHARS_FILE_NAM
 from corpus.corrector_dataset import CorrectorDataset
 from corpus.make_split_csv import BYTE_INDEX_CLEAN_STR, SPLIT_CSV_HEADER, SPLIT_STR
 from util.data_functions import get_line
-from util.edit_distance import edit_distance
+from util.edit_distance import edit_distance, edit_distance_mp
 
 
 WHITESPACE_RE = re.compile(r"\s")
@@ -44,10 +45,17 @@ class DictionaryCorrectorDataset(Dataset):
 
 
 class DictionaryCorrector:
-    def __init__(self, min_frequency: int = 2, good_chars: str = string.ascii_lowercase + string.ascii_uppercase):
+    def __init__(self,
+                 min_frequency: int = 2,
+                 good_chars: str = string.ascii_lowercase + string.ascii_uppercase,
+                 cpu_limit: int = None):
         self.min_frequency = min_frequency
         self._good_chars = WHITESPACE_RE.sub("", good_chars)
         self.vocabulary = dict()
+        if cpu_limit is None:
+            self._cpus = max(os.cpu_count() - 1, 1)
+        else:
+            self._cpus = min(max(cpu_limit, 1), os.cpu_count())
 
     def train(self, data: DictionaryCorrectorDataset):
         print(f"{self.__class__.__name__} training progress:", file=sys.stderr)
@@ -87,16 +95,36 @@ class DictionaryCorrector:
                 best_token = None
                 best_score = None
                 best_frequency = None
-                for real_token, frequency in sorted(self.vocabulary.items(), key=lambda x: abs(len(x[0]) - raw_token_size)):
-                    if best_score is not None and abs(len(real_token) - raw_token_size) > best_score:
-                        break  # not possible to get a better edit score from this word; too many letters need to be added or deleted just to match the length
-                    if frequency < self.min_frequency:
-                        continue  # this word happens so rarely we won't count it as being in the vocabulary
-                    score = edit_distance(raw_token, real_token)
-                    if best_score is None or score < best_score or (score == best_score and frequency > best_frequency):  # use frequency to break ties on edit distance
-                        best_token = real_token
-                        best_score = score
-                        best_frequency = frequency
+                sorted_filtered_vocab = [
+                    (real_token, frequency)
+                    for (real_token, frequency) in sorted(self.vocabulary.items(), key=lambda x: abs(len(x[0]) - raw_token_size))
+                    if frequency >= self.min_frequency
+                ]
+                if self._cpus > 1:  # do mp
+                    with mp.Pool(self._cpus) as pool:
+                        for (real_token, frequency), score in zip(
+                            sorted_filtered_vocab,
+                            pool.imap(
+                                edit_distance_mp,
+                                ((raw_token, real_token) for real_token, _ in sorted_filtered_vocab),
+                                chunksize=round(len(sorted_filtered_vocab) / (12 * self._cpus))  # the 12 gives scheduling flexibility
+                            )
+                        ):
+                            if best_score is not None and abs(len(real_token) - raw_token_size) > best_score:
+                                break  # not possible to get a better edit score from this word; too many letters need to be added or deleted just to match the length
+                            if best_score is None or score < best_score or (score == best_score and frequency > best_frequency):  # use frequency to break ties on edit distance
+                                best_token = real_token
+                                best_score = score
+                                best_frequency = frequency
+                else:  # don't do mp
+                    for real_token, frequency in sorted_filtered_vocab:
+                        if best_score is not None and abs(len(real_token) - raw_token_size) > best_score:
+                            break  # not possible to get a better edit score from this word; too many letters need to be added or deleted just to match the length
+                        score = edit_distance(raw_token, real_token)
+                        if best_score is None or score < best_score or (score == best_score and frequency > best_frequency):  # use frequency to break ties on edit distance
+                            best_token = real_token
+                            best_score = score
+                            best_frequency = frequency
                 to_return.append(best_token)
         return " ".join(to_return)
 

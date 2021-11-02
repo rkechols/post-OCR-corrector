@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import numpy as np
 
 
@@ -56,3 +58,7 @@ def edit_distance(s1: str, s2: str) -> int:
             scores[i, j] = min(score_options)
 
     return scores[-1, -1]
+
+
+def edit_distance_mp(t: Tuple[str, str]) -> int:
+    return edit_distance(*t)
