@@ -45,17 +45,10 @@ class DictionaryCorrectorDataset(Dataset):
 
 
 class DictionaryCorrector:
-    def __init__(self,
-                 min_frequency: int = 2,
-                 good_chars: str = string.ascii_lowercase + string.ascii_uppercase,
-                 cpu_limit: int = None):
+    def __init__(self, min_frequency: int = 2, good_chars: str = string.ascii_lowercase + string.ascii_uppercase):
         self.min_frequency = min_frequency
         self._good_chars = WHITESPACE_RE.sub("", good_chars)
         self.vocabulary = dict()
-        if cpu_limit is None:
-            self._cpus = max(os.cpu_count() - 1, 1)
-        else:
-            self._cpus = min(max(cpu_limit, 1), os.cpu_count())
 
     def train(self, data: DictionaryCorrectorDataset):
         print(f"{self.__class__.__name__} training progress:", file=sys.stderr)
@@ -81,55 +74,53 @@ class DictionaryCorrector:
         for token in tqdm(to_prune):
             del self.vocabulary[token]
 
-    def _in_vocab(self, token: str) -> bool:
+    def _in_vocab(self, raw_token: str) -> bool:
         # don't count words below the minimum frequency
-        return token in self.vocabulary and self.vocabulary[token] >= self.min_frequency
+        return raw_token in self.vocabulary and self.vocabulary[raw_token] >= self.min_frequency
 
-    def __call__(self, to_correct: str) -> str:  # inference
-        to_return = list()
-        for raw_token in to_correct.strip().split():  # split by whitespace
-            raw_token_size = len(raw_token)
-            if self._in_vocab(raw_token):  # it's in our vocab; no edit
-                to_return.append(raw_token)
-            else:  # not recognized; find the word that's closest by edit distance
-                best_token = None
-                best_score = None
-                best_frequency = None
-                sorted_filtered_vocab = [
-                    (real_token, frequency)
-                    for (real_token, frequency) in sorted(self.vocabulary.items(), key=lambda x: abs(len(x[0]) - raw_token_size))
-                    if frequency >= self.min_frequency
-                ]
-                if self._cpus > 1:  # do mp
-                    with mp.Pool(self._cpus) as pool:
-                        for (real_token, frequency), score in zip(
-                            sorted_filtered_vocab,
-                            pool.imap(
-                                edit_distance_mp,
-                                ((raw_token, real_token) for real_token, _ in sorted_filtered_vocab),
-                                chunksize=round(len(sorted_filtered_vocab) / (12 * self._cpus))  # the 12 gives scheduling flexibility
-                            )
-                        ):
-                            if best_score is not None and abs(len(real_token) - raw_token_size) > best_score:
-                                break  # not possible to get a better edit score from this word; too many letters need to be added or deleted just to match the length
-                            if best_score is None or score < best_score or (score == best_score and frequency > best_frequency):  # use frequency to break ties on edit distance
-                                best_token = real_token
-                                best_score = score
-                                best_frequency = frequency
-                                if best_score <= 2:
-                                    break  # call it quits
-                else:  # don't do mp
-                    for real_token, frequency in sorted_filtered_vocab:
-                        if best_score is not None and abs(len(real_token) - raw_token_size) > best_score:
-                            break  # not possible to get a better edit score from this word; too many letters need to be added or deleted just to match the length
-                        score = edit_distance(raw_token, real_token)
-                        if best_score is None or score < best_score or (score == best_score and frequency > best_frequency):  # use frequency to break ties on edit distance
-                            best_token = real_token
-                            best_score = score
-                            best_frequency = frequency
-                            if best_score <= 2:
-                                break  # call it quits
-                to_return.append(best_token)
+    def _infer_single_word(self, raw_token: str) -> str:
+        raw_token_size = len(raw_token)
+        if self._in_vocab(raw_token):  # it's in our vocab; no edit
+            return raw_token
+        # not recognized; find the word that's closest by edit distance
+        best_token = None
+        best_score = None
+        best_frequency = None
+        for real_token, frequency in self.vocabulary.items():
+            if frequency < self.min_frequency:
+                continue
+            if best_score is not None and abs(len(real_token) - raw_token_size) > best_score:
+                continue  # not possible to get a better edit score from this word; too many letters need to be added or deleted just to match the length
+            score = edit_distance(raw_token, real_token)
+            if best_score is None or score < best_score or (score == best_score and frequency > best_frequency):  # use frequency to break ties on edit distance
+                best_token = real_token
+                best_score = score
+                best_frequency = frequency
+                # if best_score <= 2:
+                #     break  # call it quits
+        return best_token
+
+    def __call__(self, to_correct: str, cpu_limit: int = None) -> str:  # inference
+        raw_tokens = to_correct.strip().split()  # split by whitespace
+        n = len(raw_tokens)
+        if cpu_limit is None:
+            cpus = min(os.cpu_count(), n)  # full speed, but only as many as we need
+        else:
+            cpus = min(max(cpu_limit, 1), os.cpu_count())  # clip the provided number to between `1` and `os.cpu_count()` (inclusive)
+        if cpus < 2 or n < 2:  # mp not worth it
+            to_return = list()
+            for raw_token in raw_tokens:
+                corrected_token = self._infer_single_word(raw_token)
+                to_return.append(corrected_token)
+        else:
+            to_return = [None for _ in range(n)]
+            with mp.Pool(cpus) as pool:
+                for index, corrected_token in pool.imap_unordered(
+                        self._infer_single_word_mp,
+                        (t for t in enumerate(raw_tokens)),
+                        chunksize=1  # time to execute each could vary wildly, including taking super long
+                ):
+                    to_return[index] = corrected_token
         return " ".join(to_return)
 
     def evaluate(self, dataset: CorrectorDataset, size: int = None) -> Tuple[float, float]:
