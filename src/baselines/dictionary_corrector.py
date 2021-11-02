@@ -127,6 +127,8 @@ class DictionaryCorrector:
                             best_token = real_token
                             best_score = score
                             best_frequency = frequency
+                            if best_score <= 2:
+                                break  # call it quits
                 to_return.append(best_token)
         return " ".join(to_return)
 
