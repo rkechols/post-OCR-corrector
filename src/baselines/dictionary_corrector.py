@@ -169,8 +169,10 @@ class DictionaryCorrector:
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("corpus_dir", type=str, help="File path to the directory containing the corpus to train on.")
+    arg_parser.add_argument("--cpu-limit", type=int, default=None, help="Max number of CPU cores to use.")
     args = arg_parser.parse_args()
     corpus_dir = args.corpus_dir
+    cpu_limit_ = args.cpu_limit
 
     models_dir = os.path.join("data", "models", "dictionary_corrector")
 
@@ -179,7 +181,10 @@ if __name__ == "__main__":
         good_chars_ = chars_file.read().replace("\n", "")  # these chars will be used to generate edits
 
     dataset_train = DictionaryCorrectorDataset(corpus_dir, split="train")
-    corrector = DictionaryCorrector(min_frequency=1, good_chars=good_chars_)
+    if cpu_limit_ is not None:
+        corrector = DictionaryCorrector(min_frequency=1, good_chars=good_chars_, cpu_limit=cpu_limit_)
+    else:
+        corrector = DictionaryCorrector(min_frequency=1, good_chars=good_chars_)
     corrector.train(dataset_train)
     # corrector = DictionaryCorrector.load("data/models/dictionary_corrector/dictionary_corrector-min_1.json")
 
