@@ -223,6 +223,6 @@ if __name__ == "__main__":
     corrector = DictionaryCorrector.load(best_model_path)
     print("Evaluating on test set...")
     dataset_test = CorrectorDataset(corpus_dir, split="test")
-    average_distance, percent_perfect = corrector.evaluate(dataset_val)
+    average_distance, percent_perfect = corrector.evaluate(dataset_val, size=30)
     print(f"Average edit distance: {average_distance:.2f}")
     print(f"Percent perfect: {100 * percent_perfect:.2f}%")
