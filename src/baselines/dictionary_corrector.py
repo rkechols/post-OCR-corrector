@@ -116,6 +116,8 @@ class DictionaryCorrector:
                                 best_token = real_token
                                 best_score = score
                                 best_frequency = frequency
+                                if best_score <= 2:
+                                    break  # call it quits
                 else:  # don't do mp
                     for real_token, frequency in sorted_filtered_vocab:
                         if best_score is not None and abs(len(real_token) - raw_token_size) > best_score:
