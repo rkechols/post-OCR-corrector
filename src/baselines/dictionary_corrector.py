@@ -100,9 +100,12 @@ class DictionaryCorrector:
                 to_return.append(best_token)
         return " ".join(to_return)
 
-    def evaluate(self, dataset: CorrectorDataset) -> Tuple[float, float]:
+    def evaluate(self, dataset: CorrectorDataset, size: int = None) -> Tuple[float, float]:
         print(f"{self.__class__.__name__} evaluating...", file=sys.stderr)
-        n = len(dataset)
+        if size is None:
+            n = len(dataset)
+        else:
+            n = max(min(len(dataset), size), 1)
         distance_total = 0
         n_perfect = 0
         for i in tqdm(range(n)):
@@ -170,7 +173,7 @@ if __name__ == "__main__":
             this_model_path = os.path.join(models_dir, f"dictionary_corrector-min_{min_freq}.json")
             corrector.save(this_model_path)
             print("Evaluating on validation set...")
-            average_distance, percent_perfect = corrector.evaluate(dataset_val)
+            average_distance, percent_perfect = corrector.evaluate(dataset_val, size=30)
             print(f"Average edit distance: {average_distance:.2f}")
             print(f"Percent perfect: {100 * percent_perfect:.2f}%")
             if best_model_avg is None or average_distance < best_model_avg:
