@@ -1,8 +1,9 @@
 import argparse
+import collections
+import ray
 import csv
 import json
 import math
-import multiprocessing as mp
 import os
 import re
 import string
@@ -16,7 +17,7 @@ from corpus import CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, GOOD_CHARS_FILE_NAM
 from corpus.corrector_dataset import CorrectorDataset
 from corpus.make_split_csv import BYTE_INDEX_CLEAN_STR, SPLIT_CSV_HEADER, SPLIT_STR
 from util.data_functions import get_line
-from util.edit_distance import edit_distance, edit_distance_mp
+from util.edit_distance import edit_distance
 
 
 WHITESPACE_RE = re.compile(r"\s")
@@ -74,13 +75,9 @@ class DictionaryCorrector:
         for token in tqdm(to_prune):
             del self.vocabulary[token]
 
-    def _in_vocab(self, raw_token: str) -> bool:
-        # don't count words below the minimum frequency
-        return raw_token in self.vocabulary and self.vocabulary[raw_token] >= self.min_frequency
-
     def _infer_single_word(self, raw_token: str) -> str:
         raw_token_size = len(raw_token)
-        if self._in_vocab(raw_token):  # it's in our vocab; no edit
+        if raw_token in self.vocabulary and self.vocabulary[raw_token] >= self.min_frequency:  # it's in our vocab; no edit
             return raw_token
         # not recognized; find the word that's closest by edit distance
         best_token = None
@@ -100,46 +97,62 @@ class DictionaryCorrector:
                 #     break  # call it quits
         return best_token
 
-    def __call__(self, to_correct: str, cpu_limit: int = None) -> str:  # inference
+    def __call__(self, to_correct: str) -> str:  # full sentence inference
         raw_tokens = to_correct.strip().split()  # split by whitespace
-        n = len(raw_tokens)
-        if cpu_limit is None:
-            cpus = min(os.cpu_count(), n)  # full speed, but only as many as we need
-        else:
-            cpus = min(max(cpu_limit, 1), os.cpu_count())  # clip the provided number to between `1` and `os.cpu_count()` (inclusive)
-        if cpus < 2 or n < 2:  # mp not worth it
-            to_return = list()
-            for raw_token in raw_tokens:
-                corrected_token = self._infer_single_word(raw_token)
-                to_return.append(corrected_token)
-        else:
-            to_return = [None for _ in range(n)]
-            with mp.Pool(cpus) as pool:
-                for index, corrected_token in pool.imap_unordered(
-                        self._infer_single_word_mp,
-                        (t for t in enumerate(raw_tokens)),
-                        chunksize=1  # time to execute each could vary wildly, including taking super long
-                ):
-                    to_return[index] = corrected_token
+        to_return = list()
+        for raw_token in raw_tokens:
+            corrected_token = self._infer_single_word(raw_token)
+            to_return.append(corrected_token)
         return " ".join(to_return)
 
-    def evaluate(self, dataset: CorrectorDataset, size: int = None) -> Tuple[float, float]:
+    def evaluate(self, dataset: CorrectorDataset, size: int = None, n_cpus: int = 1) -> Tuple[float, float]:
         print(f"{self.__class__.__name__} evaluating...", file=sys.stderr)
-        if size is None:
+        if size is None:  # whole thing
             n = len(dataset)
-        else:
+        else:  # clip the provided value between 1 and len(dataset), inclusive
             n = max(min(len(dataset), size), 1)
         distance_total = 0
         n_perfect = 0
-        for i in tqdm(range(n)):
-            text_messy, text_clean = dataset[i]
-            text_out = self(text_messy)
-            if text_out == text_clean:  # nailed it
-                n_perfect += 1
-            else:  # measure how far off it was
-                distance = edit_distance(text_out, text_clean)
-                distance_norm = distance / len(text_clean)
-                distance_total += distance_norm
+        if n_cpus <= 1:  # not doing multiple processes
+            for i in tqdm(range(n)):
+                text_messy, text_clean = dataset[i]
+                text_out = self(text_messy)
+                if text_out == text_clean:  # nailed it
+                    n_perfect += 1
+                else:  # measure how far off it was
+                    distance = edit_distance(text_out, text_clean)
+                    distance_norm = distance / len(text_clean)
+                    distance_total += distance_norm
+        else:  # yes doing multiple processes
+            model_ref = ray.put(self)  # load 'self' (the model) into shared memory
+            i = 0  # the next one to be put in the queue
+            answer_refs_pending = list()  # holds onto incomplete tasks
+            # put the first batch of tasks in
+            while i < n and len(answer_refs_pending) < cpus:
+                text_messy, text_clean = dataset[i]
+                answer_ref = infer_async.remote(model_ref, text_messy, text_clean)
+                answer_refs_pending.append(answer_ref)
+                i += 1
+            with tqdm(total=n) as progress:
+                while len(answer_refs_pending) > 0:  # stops when all tasks are done
+                    # wait for any pending task to be done
+                    answer_refs_done, answer_refs_pending = ray.wait(answer_refs_pending)
+                    # put the next tasks in as soon as possible
+                    while i < n and len(answer_refs_pending) < cpus:
+                        text_messy, text_clean = dataset[i]
+                        answer_ref = infer_async.remote(model_ref, text_messy, text_clean)
+                        answer_refs_pending.append(answer_ref)
+                        i += 1
+                    # process the results of completed tasks
+                    for answer_ref in answer_refs_done:
+                        text_out, text_clean = ray.get(answer_ref)
+                        if text_out == text_clean:  # nailed it
+                            n_perfect += 1
+                        else:  # measure how far off it was
+                            distance = edit_distance(text_out, text_clean)
+                            distance_norm = distance / len(text_clean)
+                            distance_total += distance_norm
+                        progress.update()
         avg_distance = distance_total / n
         return avg_distance, n_perfect / n
 
@@ -161,6 +174,12 @@ class DictionaryCorrector:
         return to_return
 
 
+@ray.remote(num_cpus=1)
+def infer_async(model: DictionaryCorrector, sentence_in: str, sentence_target: str) -> Tuple[str, str]:
+    sentence_out = model(sentence_in)
+    return sentence_out, sentence_target
+
+
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("corpus_dir", type=str, help="File path to the directory containing the corpus to train on.")
@@ -169,6 +188,11 @@ if __name__ == "__main__":
     corpus_dir = args.corpus_dir
     cpu_limit_ = args.cpu_limit
 
+    if cpu_limit_ is None:  # use all we've got
+        cpus = max(os.cpu_count() - 1, 1)
+    else:
+        cpus = min(max(cpu_limit_, 1), os.cpu_count())  # clip the provided number between 1 and os.cpu_count(), inclusive
+
     models_dir = os.path.join("data", "models", "dictionary_corrector")
 
     # get good chars
@@ -176,10 +200,7 @@ if __name__ == "__main__":
         good_chars_ = chars_file.read().replace("\n", "")  # these chars will be used to generate edits
 
     dataset_train = DictionaryCorrectorDataset(corpus_dir, split="train")
-    if cpu_limit_ is not None:
-        corrector = DictionaryCorrector(min_frequency=1, good_chars=good_chars_, cpu_limit=cpu_limit_)
-    else:
-        corrector = DictionaryCorrector(min_frequency=1, good_chars=good_chars_)
+    corrector = DictionaryCorrector(min_frequency=1, good_chars=good_chars_)
     corrector.train(dataset_train)
     # corrector = DictionaryCorrector.load("data/models/dictionary_corrector/dictionary_corrector-min_1.json")
 
@@ -201,7 +222,7 @@ if __name__ == "__main__":
             this_model_path = os.path.join(models_dir, f"dictionary_corrector-min_{min_freq}.json")
             corrector.save(this_model_path)
             print("Evaluating on validation set...")
-            average_distance, percent_perfect = corrector.evaluate(dataset_val, size=30)
+            average_distance, percent_perfect = corrector.evaluate(dataset_val, size=30, n_cpus=cpus)
             print(f"Average edit distance: {average_distance:.2f}")
             print(f"Percent perfect: {100 * percent_perfect:.2f}%")
             if best_model_avg is None or average_distance < best_model_avg:
@@ -218,6 +239,6 @@ if __name__ == "__main__":
     corrector = DictionaryCorrector.load(best_model_path)
     print("Evaluating on test set...")
     dataset_test = CorrectorDataset(corpus_dir, split="test")
-    average_distance, percent_perfect = corrector.evaluate(dataset_val, size=30)
+    average_distance, percent_perfect = corrector.evaluate(dataset_val, size=30, n_cpus=cpus)
     print(f"Average edit distance: {average_distance:.2f}")
     print(f"Percent perfect: {100 * percent_perfect:.2f}%")
