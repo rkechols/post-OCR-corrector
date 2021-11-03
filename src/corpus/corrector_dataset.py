@@ -6,13 +6,13 @@ from typing import Literal, Tuple
 
 from torch.utils.data import Dataset
 
-from corpus import CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, SPLIT_FILE_NAME
+from corpus import ALL_CHARS_FILE_NAME, CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, SPLIT_FILE_NAME
 from corpus.make_split_csv import BYTE_INDEX_CLEAN_STR, BYTE_INDEX_MESSY_STR, SPLIT_CSV_HEADER, SPLIT_NAMES, SPLIT_STR
-from util.data_functions import get_line
+from util.data_functions import get_line, text_to_tensor
 
 
 class CorrectorDataset(Dataset):
-    def __init__(self, data_dir: str, split: Literal["train", "validation", "test"]):
+    def __init__(self, data_dir: str, split: Literal["train", "validation", "test"], tensors_out: bool = False):
         print(f"Loading {self.__class__.__name__}, split='{split}'", file=sys.stderr)
         self.clean_corpus_path = os.path.join(data_dir, CORPUS_PLAIN_FILE_NAME)
         self.messy_corpus_path = os.path.join(data_dir, CORPUS_MESSY_FILE_NAME)
@@ -24,6 +24,9 @@ class CorrectorDataset(Dataset):
             for row in csv_reader:
                 if row[SPLIT_STR] == split:
                     self.byte_indices.append((int(row[BYTE_INDEX_CLEAN_STR]), int(row[BYTE_INDEX_MESSY_STR])))
+        with open(os.path.join(data_dir, ALL_CHARS_FILE_NAME), "r", encoding=DEFAULT_ENCODING) as chars_file:
+            self._all_chars = chars_file.read().replace("\n", "")
+        self.tensors_out = tensors_out
 
     def __len__(self) -> int:
         return len(self.byte_indices)
@@ -32,6 +35,9 @@ class CorrectorDataset(Dataset):
         byte_index_clean, byte_index_messy = self.byte_indices[index]
         text_clean = get_line(self.clean_corpus_path, byte_index_clean)
         text_messy = get_line(self.messy_corpus_path, byte_index_messy)
+        if self.tensors_out:
+            text_messy = text_to_tensor(text_messy, self._all_chars)
+            text_clean = text_to_tensor(text_clean, self._all_chars)
         return text_messy, text_clean
 
 
