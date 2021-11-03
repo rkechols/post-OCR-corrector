@@ -1,6 +1,4 @@
 import argparse
-import collections
-import ray
 import csv
 import json
 import math
@@ -10,6 +8,7 @@ import string
 import sys
 from typing import Literal, Tuple
 
+import ray
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
@@ -183,9 +182,11 @@ def infer_async(model: DictionaryCorrector, sentence_in: str, sentence_target: s
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("corpus_dir", type=str, help="File path to the directory containing the corpus to train on.")
-    arg_parser.add_argument("--cpu-limit", type=int, default=None, help="Max number of CPU cores to use.")
+    arg_parser.add_argument("--n-to-eval", type=int, default=30, help="Max number of sentences to evaluate each model on.")
+    arg_parser.add_argument("--cpu-limit", type=int, default=None, help="Max number of CPU processors to use.")
     args = arg_parser.parse_args()
     corpus_dir = args.corpus_dir
+    n_to_eval = args.n_to_eval
     cpu_limit_ = args.cpu_limit
 
     if cpu_limit_ is None:  # use all we've got
@@ -211,10 +212,13 @@ if __name__ == "__main__":
 
     # estimate a min_freq value that will give us just the top 1000 words
     freq_for_top_1000 = max(corrector.vocabulary.values()) / 1000
+    range_limit = math.ceil(math.log2(freq_for_top_1000))
+    min_freq_options = [2 ** power for power in range(1, range_limit)]
+    print(f"Trying dataset pruned to varying degrees (min_frequency options: {min_freq_options})")
+    print("Press CTRL+C at any point to interrupt and skip to final 'test' evaluation on the best model so far.")
 
     try:
-        for power in range(math.ceil(math.log2(freq_for_top_1000))):
-            min_freq = 2 ** power
+        for min_freq in min_freq_options:
             print("----------")
             print(f"min_frequency = {min_freq}")
             corrector.min_frequency = min_freq
@@ -222,7 +226,7 @@ if __name__ == "__main__":
             this_model_path = os.path.join(models_dir, f"dictionary_corrector-min_{min_freq}.json")
             corrector.save(this_model_path)
             print("Evaluating on validation set...")
-            average_distance, percent_perfect = corrector.evaluate(dataset_val, size=30, n_cpus=cpus)
+            average_distance, percent_perfect = corrector.evaluate(dataset_val, size=n_to_eval, n_cpus=cpus)
             print(f"Average edit distance: {average_distance:.2f}")
             print(f"Percent perfect: {100 * percent_perfect:.2f}%")
             if best_model_avg is None or average_distance < best_model_avg:
@@ -239,6 +243,6 @@ if __name__ == "__main__":
     corrector = DictionaryCorrector.load(best_model_path)
     print("Evaluating on test set...")
     dataset_test = CorrectorDataset(corpus_dir, split="test")
-    average_distance, percent_perfect = corrector.evaluate(dataset_val, size=30, n_cpus=cpus)
+    average_distance, percent_perfect = corrector.evaluate(dataset_test, size=n_to_eval, n_cpus=cpus)
     print(f"Average edit distance: {average_distance:.2f}")
     print(f"Percent perfect: {100 * percent_perfect:.2f}%")
