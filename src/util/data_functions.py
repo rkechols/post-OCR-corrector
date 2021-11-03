@@ -23,7 +23,11 @@ def get_line(file_path: str, byte_index: int) -> str:
 
 
 def text_to_tensor(text: str, all_chars: str) -> Tensor:
-    one_hot_tensor = torch.zeros((len(text), len(all_chars) + 1))  # +1 is for unknown
-    for i, index in enumerate(all_chars.find(char) for char in text):  # if char is not found, `find` gives -1
-        one_hot_tensor[i, index] = 1
-    return one_hot_tensor
+    unknown_index = len(all_chars)
+    tensor_out = torch.empty(len(text), dtype=torch.long)
+    for i, index in enumerate(all_chars.find(char) for char in text):
+        if index == -1:  # if char is not found (unknown), `find` gives -1
+            tensor_out[i] = unknown_index
+        else:  # regular char
+            tensor_out[i] = index
+    return tensor_out
