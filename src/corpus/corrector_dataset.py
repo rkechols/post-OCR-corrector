@@ -4,6 +4,7 @@ import sys
 import time
 from typing import Literal, Tuple
 
+import numpy as np
 from torch.utils.data import Dataset
 
 from corpus import ALL_CHARS_FILE_NAME, CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, SPLIT_FILE_NAME
@@ -17,16 +18,21 @@ class CorrectorDataset(Dataset):
         self.clean_corpus_path = os.path.join(data_dir, CORPUS_PLAIN_FILE_NAME)
         self.messy_corpus_path = os.path.join(data_dir, CORPUS_MESSY_FILE_NAME)
         split_csv_path = os.path.join(data_dir, SPLIT_FILE_NAME)
-        self.byte_indices = list()
+        byte_indices = list()
         with open(split_csv_path, "r", encoding=DEFAULT_ENCODING, newline="") as split_file:
             csv_reader = csv.DictReader(split_file)
             assert csv_reader.fieldnames == SPLIT_CSV_HEADER, f"{split_csv_path} had unexpected header: {csv_reader.fieldnames}"
             for row in csv_reader:
                 if row[SPLIT_STR] == split:
-                    self.byte_indices.append((int(row[BYTE_INDEX_CLEAN_STR]), int(row[BYTE_INDEX_MESSY_STR])))
+                    byte_indices.append((int(row[BYTE_INDEX_CLEAN_STR]), int(row[BYTE_INDEX_MESSY_STR])))
+        self.byte_indices = np.array(byte_indices)  # numpy array so that when the dataset is copied by the workers, it doesn't copy this whole array at every access
         with open(os.path.join(data_dir, ALL_CHARS_FILE_NAME), "r", encoding=DEFAULT_ENCODING) as chars_file:
             self._all_chars = chars_file.read().replace("\n", "")
         self.tensors_out = tensors_out
+
+    @property
+    def alphabet_size(self) -> int:
+        return len(self._all_chars)
 
     def __len__(self) -> int:
         return len(self.byte_indices)

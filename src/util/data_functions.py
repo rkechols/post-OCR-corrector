@@ -1,3 +1,5 @@
+from typing import List, Tuple
+
 import torch
 from torch import Tensor
 
@@ -31,3 +33,27 @@ def text_to_tensor(text: str, all_chars: str) -> Tensor:
         else:  # regular char
             tensor_out[i] = index
     return tensor_out
+
+
+def collate_sequences(data_pairs: List[Tuple[Tensor, Tensor]]) -> Tuple[Tensor, Tensor]:
+    # find the longest sequence length
+    x_size = max(x.shape[0] for x, _ in data_pairs)
+    y_size = max(y.shape[0] for _, y in data_pairs)
+    x_stack = list()
+    y_stack = list()
+    for x, y in data_pairs:
+        # does x need padding?
+        x_len_diff = x_size - x.shape[0]
+        if x_len_diff > 0:
+            x_stack.append(torch.cat([x, torch.full((x_len_diff,), -1)], dim=0))
+        else:
+            x_stack.append(x)
+        # does y need padding
+        y_len_diff = y_size - y.shape[0]
+        if y_len_diff > 0:
+            y_stack.append(torch.cat([y, torch.full((y_len_diff,), -1)], dim=0))
+        else:
+            y_stack.append(y)
+    x_batch = torch.stack(x_stack, dim=1)  # sequence first, batch second
+    y_batch = torch.stack(y_stack, dim=1)
+    return x_batch, y_batch
