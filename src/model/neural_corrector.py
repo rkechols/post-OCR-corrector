@@ -143,7 +143,7 @@ if __name__ == "__main__":
         cpus = 0  # DataLoader expects 0 if we're not doing extra workers
 
     dataset = CorrectorDataset(corpus_dir, split="validation", tensors_out=True)
-    dataloader = DataLoader(dataset, batch_size=3, num_workers=cpus, collate_fn=collate_sequences)  # TODO: set workers to max and get a better batch size
+    dataloader = DataLoader(dataset, batch_size=3, num_workers=cpus, collate_fn=collate_sequences)
     model = NeuralCorrector(dataset.alphabet_size)
     model.to(device_)
     for batch_ in dataloader:
