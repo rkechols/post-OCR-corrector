@@ -90,7 +90,7 @@ class NeuralCorrector(pl.LightningModule):
         x = self.positional_encoding(self.embedding_src(x.detach()))  # detach is so we don't need to back-prop through the data prep
         y_in = self.positional_encoding(self.embedding_tgt(y_in.detach()))
         # make a mask so it can't cheat when learning how to sequentially generate
-        y_mask = nn.Transformer.generate_square_subsequent_mask(y_in.shape[0])
+        y_mask = nn.Transformer.generate_square_subsequent_mask(y_in.shape[0]).to(device)
         # pass the sequences through the main part of the model
         y_hat = self.transformer(x, y_in, tgt_mask=y_mask, src_key_padding_mask=x_padding_mask, tgt_key_padding_mask=y_padding_mask)
         y_hat = self.linear_stack(y_hat)
@@ -139,6 +139,7 @@ if __name__ == "__main__":
     for batch_ in dataloader:
         batch_ = tuple(t.to(device_) for t in batch_)
         # try both functions
+        print("starting to run things through the model...")
         output = model(batch_[0])
         print(f"{output=}")
         loss_ = model.training_step(batch_, 0)
