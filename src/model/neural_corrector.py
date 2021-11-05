@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 
 import pytorch_lightning as pl
@@ -120,9 +121,11 @@ if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("corpus_dir", type=str, help="File path to the directory containing the corpus to collect chars from.")
     arg_parser.add_argument("--cuda", type=int, default=None, help="Index of the CUDA device (GPU) to use.")
+    arg_parser.add_argument("--cpu-limit", type=int, default=None, help="Max number of CPU processors to use.")
     args = arg_parser.parse_args()
     corpus_dir = args.corpus_dir
     cuda_index = args.cuda
+    cpu_limit = args.cpu_limit
 
     if cuda_index is None:
         device_ = torch.device("cpu")
@@ -132,8 +135,15 @@ if __name__ == "__main__":
     else:
         device_ = torch.device(f"cuda:{cuda_index}")
 
+    if cpu_limit is None:  # use all we've got
+        cpus = max(os.cpu_count(), 1)
+    else:
+        cpus = min(max(cpu_limit, 1), os.cpu_count())  # clip the provided number between 1 and os.cpu_count(), inclusive
+    if cpus == 1:
+        cpus = 0  # DataLoader expects 0 if we're not doing extra workers
+
     dataset = CorrectorDataset(corpus_dir, split="validation", tensors_out=True)
-    dataloader = DataLoader(dataset, batch_size=3, num_workers=3, collate_fn=collate_sequences)  # TODO: set workers to max and get a better batch size
+    dataloader = DataLoader(dataset, batch_size=3, num_workers=cpus, collate_fn=collate_sequences)  # TODO: set workers to max and get a better batch size
     model = NeuralCorrector(dataset.alphabet_size)
     model.to(device_)
     for batch_ in dataloader:
