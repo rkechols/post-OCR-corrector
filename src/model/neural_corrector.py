@@ -1,3 +1,6 @@
+import argparse
+import sys
+
 import pytorch_lightning as pl
 import torch
 from torch import nn, Tensor
@@ -30,41 +33,48 @@ class NeuralCorrector(pl.LightningModule):
             nn.Linear(d_model, self.vocab_size)
         )
         self.criterion = nn.CrossEntropyLoss()  # TODO: label smoothing? label weights?
+        self.max_len = max_len
 
     def forward(self, x: Tensor) -> Tensor:
+        device = x.device
         # TODO: max sequence length?
         batch_size = x.shape[1]  # 0 = sequence, 1 = batch
-        # get padding mask
-        x_padding_mask = torch.where(x == -1, True, False)
-        # convert any -1 to the actual padding index
-        x[x_padding_mask] = self.pad_index
+        x_padding_mask = torch.where(x == -1, True, False)  # get padding mask for the input sequence
+        x[x_padding_mask] = self.pad_index  # convert any -1 to the actual padding index
         x = self.positional_encoding(self.embedding_src(x.detach()))  # detach is so we don't need to back-prop through the data prep
-        x = self.transformer.encoder(x, src_key_padding_mask=x_padding_mask)
-        # make a sequence to go in the decoder, gradually growing
-        sequence = torch.full((1, batch_size), self.bookend_index, dtype=torch.long)
-        terminated = torch.zeros(batch_size).bool()  # keep track of which sequences have finished
+        # put the input sequence into the encoder to get the "context"/"memory" sequence
+        x = self.transformer.encoder(x, src_key_padding_mask=torch.permute(x_padding_mask, (1, 0)))
+        # make a sequence to go in the decoder, gradually growing. starts with just a bookend
+        sequence = torch.full((1, batch_size), self.bookend_index, dtype=torch.long, device=device)
+        terminated = torch.zeros(batch_size, device=device).bool()  # keep track of which sequences have finished
+        # make a padding mask that will grow with the sequence
+        sequence_padding_mask = torch.zeros((batch_size, 1), device=device).bool()  # the mask is transposed the whole time
         while True:
-            sequence_padding_mask = 1  # TODO
-            sequence_embed = self.positional_encoding(self.embedding_tgt(sequence))
+            sequence_embed = self.positional_encoding(self.embedding_tgt(sequence))  # turn indices into embeddings
             new_thing = self.transformer.decoder(sequence_embed, x, tgt_key_padding_mask=sequence_padding_mask)[-1, :]  # only take the last token
             new_thing = self.linear_stack(new_thing)
             new_thing = torch.argmax(new_thing, dim=-1)
-            terminated = terminated or (new_thing == self.bookend_index)
-            if terminated.all():
+            # update which sequences are done
+            terminated = terminated + (new_thing == self.bookend_index)  # '+' with bool tensors is element-wise 'or'
+            if torch.all(terminated):
                 break  # all pieces of the batch are done
+            # if a sequence is done, force it to be only padding
+            new_thing[terminated] = self.pad_index
+            # actually add the new thing to the sequence
             sequence = torch.cat([sequence, new_thing.unsqueeze(0)], dim=0)
-        sequence = torch.where(sequence == self.bookend_index, self.pad_index, sequence)
-        # trim padding from the end (if the last thing in all sequences is padding, chop off the las thing from each sequence)
-        while sequence.shape[0] > 0 and torch.all(sequence[-1, :] == self.pad_index):
-            sequence = sequence[:-1, :]
-        # convert any padding to -1
-        sequence = torch.where(sequence == self.pad_index, -1, sequence)
+            if sequence.shape[0] > self.max_len:  # no more room; stop generating
+                break  # TODO: do we want to do a sliding window to keep generating?
+            # also update the padding mask, remembering that the mask is transposed
+            sequence_padding_mask = torch.cat([sequence_padding_mask, torch.where(new_thing == self.pad_index, True, False).unsqueeze(1)], dim=1)
+        sequence = sequence[1:, :]  # chop off the starting bookend
+        sequence = torch.where(sequence == self.pad_index, -1, sequence)  # convert any padding to -1
         return sequence
 
     def training_step(self, batch, batch_idx) -> Tensor:
         # TODO: max sequence length?
         x, y = batch  # 0 = sequence, 1 = batch
         batch_size = x.shape[1]
+        device = x.device
         # get padding masks
         x_padding_mask = torch.where(x == -1, True, False)
         y_padding_mask = torch.where(y == -1, True, False)
@@ -72,10 +82,10 @@ class NeuralCorrector(pl.LightningModule):
         x[x_padding_mask] = self.pad_index
         y[y_padding_mask] = self.pad_index
         # stick a "start token" at the beginning of the target sequence
-        bookend_tensor = torch.full((1, batch_size), self.bookend_index)
-        y_in = torch.cat([bookend_tensor, y], dim=0)
+        y_in = torch.cat([torch.full((1, batch_size), self.bookend_index, device=device), y], dim=0)
+        # make padding masks
         x_padding_mask = torch.permute(x_padding_mask, (1, 0))  # also permute since that's what torch wants
-        y_padding_mask = torch.permute(torch.cat([torch.zeros((1, batch_size)).bool(), y_padding_mask], dim=0), (1, 0))
+        y_padding_mask = torch.permute(torch.cat([torch.zeros((1, batch_size), device=device).bool(), y_padding_mask], dim=0), (1, 0))
         # turn indices into embeddings
         x = self.positional_encoding(self.embedding_src(x.detach()))  # detach is so we don't need to back-prop through the data prep
         y_in = self.positional_encoding(self.embedding_tgt(y_in.detach()))
@@ -85,7 +95,7 @@ class NeuralCorrector(pl.LightningModule):
         y_hat = self.transformer(x, y_in, tgt_mask=y_mask, src_key_padding_mask=x_padding_mask, tgt_key_padding_mask=y_padding_mask)
         y_hat = self.linear_stack(y_hat)
         # add a bookend token to the end of each sequence in y, so the loss is teaching it to end with a bookend
-        y_target = torch.cat([y, torch.full((1, batch_size), self.pad_index)], dim=0)
+        y_target = torch.cat([y, torch.full((1, batch_size), self.pad_index, device=device)], dim=0)
         for i in range(batch_size):  # for each sequence
             for j in range(y_target.shape[0] - 2, -1, -1):  # go from the last slot toward the start (but skip the added padding)
                 if y_target[j, i] != self.pad_index:  # looking for something that isn't padding
@@ -107,10 +117,30 @@ class NeuralCorrector(pl.LightningModule):
 
 
 if __name__ == "__main__":
-    dataset = CorrectorDataset("data/corpus/srWaC", split="validation", tensors_out=True)
-    dataloader = DataLoader(dataset, batch_size=2, num_workers=2, collate_fn=collate_sequences)
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("corpus_dir", type=str, help="File path to the directory containing the corpus to collect chars from.")
+    arg_parser.add_argument("--cuda", type=int, default=None, help="Index of the CUDA device (GPU) to use.")
+    args = arg_parser.parse_args()
+    corpus_dir = args.corpus_dir
+    cuda_index = args.cuda
+
+    if cuda_index is None:
+        device_ = torch.device("cpu")
+    elif cuda_index >= (cuda_count := torch.cuda.device_count()) or cuda_index < 0:
+        print(f"WARNING: provided cuda index '{cuda_index}' is not valid (available count = {cuda_count}); defaulting to CPU", file=sys.stderr)
+        device_ = torch.device("cpu")
+    else:
+        device_ = torch.device(f"cuda:{cuda_index}")
+
+    dataset = CorrectorDataset(corpus_dir, split="validation", tensors_out=True)
+    dataloader = DataLoader(dataset, batch_size=3, num_workers=3, collate_fn=collate_sequences)  # TODO: set workers to max and get a better batch size
     model = NeuralCorrector(dataset.alphabet_size)
+    model.to(device_)
     for batch_ in dataloader:
+        batch_ = tuple(t.to(device_) for t in batch_)
+        # try both functions
         output = model(batch_[0])
+        print(f"{output=}")
         loss_ = model.training_step(batch_, 0)
+        print(f"{loss_=}")
         break
