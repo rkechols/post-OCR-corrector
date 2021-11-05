@@ -34,6 +34,10 @@ class CorrectorDataset(Dataset):
     def alphabet_size(self) -> int:
         return len(self._all_chars)
 
+    @property
+    def alphabet(self) -> str:
+        return self._all_chars
+
     def __len__(self) -> int:
         return len(self.byte_indices)
 

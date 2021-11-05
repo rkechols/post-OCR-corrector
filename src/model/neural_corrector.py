@@ -150,8 +150,21 @@ if __name__ == "__main__":
         batch_ = tuple(t.to(device_) for t in batch_)
         # try both functions
         print("starting to run things through the model...")
-        output = model(batch_[0])
-        print(f"{output=}")
         loss_ = model.training_step(batch_, 0)
         print(f"{loss_=}")
+        output = model(batch_[0])
+        print(f"{output=}")
+        # interpret output as a string
+        print("\nGenerated outputs from untrained model:")
+        alphabet = dataset.alphabet
+        for i_ in range(output.shape[1]):
+            sequence = list()
+            for j_ in range(output.shape[0]):
+                char_index = output[j_, i_].item()
+                if char_index == -1:
+                    break
+                sequence.append(alphabet[char_index])
+            sequence_str = "".join(sequence)
+            print(f"\nOutput sequence {i_}: {sequence_str}")
+            print(f"(Length: {len(sequence_str)})")
         break
