@@ -148,6 +148,8 @@ if __name__ == "__main__":
     model.to(device_)
     for batch_ in dataloader:
         batch_ = tuple(t.to(device_) for t in batch_)
+        print(f"input tensor shape/type: {batch_[0].shape}/{batch_[0].dtype}")
+        print(f"output tensor shape/type: {batch_[1].shape}/{batch_[1].dtype}")
         # try both functions
         print("starting to run things through the model...")
         loss_ = model.training_step(batch_, 0)

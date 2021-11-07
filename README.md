@@ -70,4 +70,6 @@ python my_script.py -h
     ("nearest" measured by Damerau-Levenshtein distance). Because this algorithm for correcting sentences is very slow,
     evaluation can take a very long time.
 
+### 3. Find Good Hyperparameters
+
 **TODO**
