@@ -4,7 +4,8 @@ import os
 
 from tqdm import tqdm
 
-from corpus import CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, SPLIT_FILE_NAME
+from corpus import CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, SPLIT_FILE_NAME
+from util import DEFAULT_ENCODING
 
 
 SPLIT_TRAIN = "train"

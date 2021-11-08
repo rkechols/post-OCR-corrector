@@ -3,7 +3,7 @@ from typing import List, Tuple
 import torch
 from torch import Tensor
 
-from corpus import DEFAULT_ENCODING
+from util import DEFAULT_ENCODING
 
 
 def get_line(file_path: str, byte_index: int) -> str:

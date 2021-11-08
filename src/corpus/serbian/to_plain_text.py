@@ -4,9 +4,10 @@ from typing import List
 
 from tqdm import tqdm
 
-from corpus import CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING
+from corpus import CORPUS_PLAIN_FILE_NAME
 from corpus.serbian import CORPUS_DIR
 from corpus.serbian.srwac import NO_SPACE_TAG, SrWaC
+from util import DEFAULT_ENCODING
 
 
 CORPUS_PLAIN_FILE_PATH = os.path.join(CORPUS_DIR, CORPUS_PLAIN_FILE_NAME)

@@ -5,7 +5,8 @@ from enum import auto, Enum
 
 from tqdm import tqdm
 
-from corpus import CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING, GOOD_CHARS_FILE_NAME
+from corpus import CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, GOOD_CHARS_FILE_NAME
+from util import DEFAULT_ENCODING
 
 
 class EditType(Enum):

@@ -1,7 +1,8 @@
 import argparse
 import os
 
-from corpus import ALL_CHARS_FILE_NAME, CORPUS_PLAIN_FILE_NAME, DEFAULT_ENCODING
+from corpus import ALL_CHARS_FILE_NAME, CORPUS_PLAIN_FILE_NAME
+from util import DEFAULT_ENCODING
 
 
 if __name__ == "__main__":
