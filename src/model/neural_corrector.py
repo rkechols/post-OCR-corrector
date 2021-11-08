@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+from typing import List, Tuple
 
 import pytorch_lightning as pl
 import torch
@@ -14,18 +15,36 @@ from util.data_functions import collate_sequences
 
 
 class NeuralCorrector(pl.LightningModule):
-    def __init__(self, alphabet_size: int, d_model: int = 512, max_len: int = 512):
+    def __init__(self, data_dir: str, alphabet_size: int, cpus: int = None, max_len: int = 512,
+                 d_model: int = 512,
+                 n_head: int = 8,
+                 n_encoder_layers: int = 6,
+                 n_decoder_layers: int = 6,
+                 d_linear: int = 2048,
+                 dropout: float = 0.1,
+                 layer_norm_eps: float = 1e-5,
+                 label_smoothing: float = 0.0,
+                 lr: float = 4e-3,
+                 batch_size: int = 16):
         super().__init__()
+        self.data_dir = data_dir
         self.unk_index = alphabet_size
         self.bookend_index = alphabet_size + 1
         self.pad_index = alphabet_size + 2
         self.vocab_size = alphabet_size + 3
+        self.cpus = cpus or os.cpu_count()
+        self.max_len = max_len
         self.embedding_src = nn.Embedding(self.vocab_size, d_model, padding_idx=self.pad_index)
         self.embedding_tgt = nn.Embedding(self.vocab_size, d_model, padding_idx=self.pad_index)
         self.positional_encoding = PositionalEncoding(d_model, max_len=max_len)
         self.transformer = nn.Transformer(
             d_model=d_model,
-            # TODO: other hyperparameters
+            nhead=n_head,
+            num_encoder_layers=n_encoder_layers,
+            num_decoder_layers=n_decoder_layers,
+            dim_feedforward=d_linear,
+            dropout=dropout,
+            layer_norm_eps=layer_norm_eps,
             norm_first=True
         )
         self.linear_stack = nn.Sequential(
@@ -33,11 +52,12 @@ class NeuralCorrector(pl.LightningModule):
             nn.ReLU(),
             nn.Linear(d_model, self.vocab_size)
         )
-        self.criterion = nn.CrossEntropyLoss()  # TODO: label smoothing? label weights?
-        self.max_len = max_len
+        self.criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+        self.lr = lr
+        self.batch_size = batch_size
 
     def forward(self, x: Tensor) -> Tensor:
-        device = x.device
+        device = self.device
         # TODO: max sequence length?
         batch_size = x.shape[1]  # 0 = sequence, 1 = batch
         x_padding_mask = torch.where(x == -1, True, False)  # get padding mask for the input sequence
@@ -71,11 +91,10 @@ class NeuralCorrector(pl.LightningModule):
         sequence = torch.where(sequence == self.pad_index, -1, sequence)  # convert any padding to -1
         return sequence
 
-    def training_step(self, batch, batch_idx) -> Tensor:
+    def forward_with_target(self, x: Tensor, y: Tensor) -> Tensor:
         # TODO: max sequence length?
-        x, y = batch  # 0 = sequence, 1 = batch
         batch_size = x.shape[1]
-        device = x.device
+        device = self.device
         # get padding masks
         x_padding_mask = torch.where(x == -1, True, False)
         y_padding_mask = torch.where(y == -1, True, False)
@@ -109,11 +128,31 @@ class NeuralCorrector(pl.LightningModule):
         y_target = torch.permute(y_target, (1, 0))
         # get the loss
         loss = self.criterion(y_hat, y_target)
-        self.log("train_loss", loss)
         return loss
 
+    def training_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int) -> Tensor:
+        loss = self.forward_with_target(*batch)
+        self.log("ptl/train_loss", loss)
+        return loss
+
+    def validation_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int) -> Tensor:
+        loss = self.forward_with_target(*batch)
+        return loss
+
+    def validation_epoch_end(self, val_losses: List[Tensor]):
+        avg_loss = torch.stack(val_losses).mean()
+        self.log("ptl/val_loss", avg_loss)
+
+    def train_dataloader(self) -> DataLoader:
+        dataset_train = CorrectorDataset(self.data_dir, split="train", tensors_out=True)
+        return DataLoader(dataset_train, batch_size=self.batch_size, num_workers=self.cpus, collate_fn=collate_sequences)
+
+    def val_dataloader(self) -> DataLoader:
+        dataset_val = CorrectorDataset(self.data_dir, split="validation", tensors_out=True)
+        return DataLoader(dataset_val, batch_size=self.batch_size, num_workers=self.cpus, collate_fn=collate_sequences)
+
     def configure_optimizers(self) -> Optimizer:
-        optimizer = torch.optim.Adam(self.parameters(), lr=4e-3)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return optimizer
 
 
@@ -125,7 +164,7 @@ if __name__ == "__main__":
     args = arg_parser.parse_args()
     corpus_dir = args.corpus_dir
     cuda_index = args.cuda
-    cpu_limit = args.cpu_limit
+    cpu_limit_ = args.cpu_limit
 
     if cuda_index is None:
         device_ = torch.device("cpu")
@@ -135,19 +174,19 @@ if __name__ == "__main__":
     else:
         device_ = torch.device(f"cuda:{cuda_index}")
 
-    if cpu_limit is None:  # use all we've got
-        cpus = max(os.cpu_count(), 1)
+    if cpu_limit_ is None:  # use all we've got
+        cpus_ = os.cpu_count()
     else:
-        cpus = min(max(cpu_limit, 1), os.cpu_count())  # clip the provided number between 1 and os.cpu_count(), inclusive
-    if cpus == 1:
-        cpus = 0  # DataLoader expects 0 if we're not doing extra workers
+        cpus_ = min(max(cpu_limit_, 1), os.cpu_count())  # clip the provided number between 1 and os.cpu_count(), inclusive
+    if cpus_ == 1:
+        cpus_ = 0  # DataLoader expects 0 if we're not doing extra workers
 
     dataset = CorrectorDataset(corpus_dir, split="validation", tensors_out=True)
-    dataloader = DataLoader(dataset, batch_size=3, num_workers=cpus, collate_fn=collate_sequences)
-    model = NeuralCorrector(dataset.alphabet_size)
+    dataloader = DataLoader(dataset, batch_size=3, num_workers=cpus_, collate_fn=collate_sequences)
+    model = NeuralCorrector(corpus_dir, dataset.alphabet_size, cpus_)
     model.to(device_)
     for batch_ in dataloader:
-        batch_ = tuple(t.to(device_) for t in batch_)
+        batch_ = (batch_[0].to(device_), batch_[1].to(device_))
         print(f"input tensor shape/type: {batch_[0].shape}/{batch_[0].dtype}")
         print(f"output tensor shape/type: {batch_[1].shape}/{batch_[1].dtype}")
         # try both functions
@@ -160,13 +199,13 @@ if __name__ == "__main__":
         print("\nGenerated outputs from untrained model:")
         alphabet = dataset.alphabet
         for i_ in range(output.shape[1]):
-            sequence = list()
+            sequence_ = list()
             for j_ in range(output.shape[0]):
                 char_index = output[j_, i_].item()
                 if char_index == -1:
                     break
-                sequence.append(alphabet[char_index])
-            sequence_str = "".join(sequence)
+                sequence_.append(alphabet[char_index])
+            sequence_str = "".join(sequence_)
             print(f"\nOutput sequence {i_}: {sequence_str}")
             print(f"(Length: {len(sequence_str)})")
         break
