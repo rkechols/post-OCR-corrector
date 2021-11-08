@@ -32,7 +32,10 @@ class NeuralCorrector(pl.LightningModule):
         self.bookend_index = alphabet_size + 1
         self.pad_index = alphabet_size + 2
         self.vocab_size = alphabet_size + 3
-        self.cpus = cpus or os.cpu_count()
+        if cpus is None:
+            self.cpus = os.cpu_count()
+        else:
+            self.cpus = cpus
         self.max_len = max_len
         self.embedding_src = nn.Embedding(self.vocab_size, d_model, padding_idx=self.pad_index)
         self.embedding_tgt = nn.Embedding(self.vocab_size, d_model, padding_idx=self.pad_index)
