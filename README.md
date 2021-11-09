@@ -67,9 +67,11 @@ python my_script.py -h
 
 1. Train a Baseline: `src/baselines/dictionary_corrector.py`  
     Train a basic dictionary-based corrector that corrects unknown words by replacing them with the nearest known word
-    ("nearest" measured by Damerau-Levenshtein distance). Because this algorithm for correcting sentences is very slow,
-    evaluation can take a very long time.
+    ("nearest" measured by Damerau-Levenshtein distance). Because this algorithm for correcting sentences is very slow
+    and scales with the vocabulary size, evaluation can take a very long time.
 
-### 3. Find Good Hyperparameters
+### 3. Train and Evaluate Neural Model
+
+1. Find Hyperparameters: 
 
 **TODO**

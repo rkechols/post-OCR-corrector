@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 
 from corpus.corrector_dataset import CorrectorDataset
 from model.positional_encoding import PositionalEncoding
+from util import INT_EMPTY
 from util.data_functions import collate_sequences, collate_single_column, get_alphabet, text_to_tensor
 
 
@@ -68,8 +69,8 @@ class NeuralCorrector(pl.LightningModule):
             x = x[:self.max_len, :]
         in_length, batch_size = x.shape
         device = self.device
-        x_padding_mask = torch.where(x == -1, True, False)  # get padding mask for the input sequence
-        x[x_padding_mask] = self.pad_index  # convert any -1 to the actual padding index
+        x_padding_mask = torch.where(x == INT_EMPTY, True, False)  # get padding mask for the input sequence
+        x[x_padding_mask] = self.pad_index  # convert any INT_EMPTY to the actual padding index
         x = self.positional_encoding(self.embedding_src(x.detach()))  # detach is so we don't need to back-prop through the data prep
         # put the input sequence into the encoder to get the "context"/"memory" sequence
         x = self.transformer.encoder(x, src_key_padding_mask=torch.permute(x_padding_mask, (1, 0)))
@@ -99,7 +100,7 @@ class NeuralCorrector(pl.LightningModule):
             # also update the padding mask, remembering that the mask is transposed
             sequence_padding_mask = torch.cat([sequence_padding_mask, torch.where(new_thing == self.pad_index, True, False).unsqueeze(1)], dim=1)
         sequence = sequence[1:, :]  # chop off the starting bookend
-        sequence = torch.where(sequence == self.pad_index, -1, sequence)  # convert any padding to -1
+        sequence = torch.where(sequence == self.pad_index, INT_EMPTY, sequence)  # convert any padding to INT_EMPTY
         return sequence
 
     def tensor_to_texts(self, t: Tensor) -> List[str]:
@@ -108,9 +109,13 @@ class NeuralCorrector(pl.LightningModule):
             sequence = list()
             for j in range(t.shape[0]):
                 char_index = t[j, i].item()
-                if char_index == -1:
+                if char_index == INT_EMPTY:
                     break
-                sequence.append(self.alphabet[char_index])
+                try:
+                    sequence.append(self.alphabet[char_index])
+                except IndexError:
+                    print(f"UNKNOWN INDEX: {char_index}", file=sys.stderr)
+                    sequence.append("<UNK>")
             sequence_str = "".join(sequence)
             to_return.append(sequence_str)
         return to_return
@@ -149,9 +154,9 @@ class NeuralCorrector(pl.LightningModule):
         batch_size = x.shape[1]
         device = self.device
         # get padding masks
-        x_padding_mask = torch.where(x == -1, True, False)
-        y_padding_mask = torch.where(y == -1, True, False)
-        # convert any -1 to the actual padding index
+        x_padding_mask = torch.where(x == INT_EMPTY, True, False)
+        y_padding_mask = torch.where(y == INT_EMPTY, True, False)
+        # convert any INT_EMPTY to the actual padding index
         x[x_padding_mask] = self.pad_index
         y[y_padding_mask] = self.pad_index
         # stick a "start token" at the beginning of the target sequence

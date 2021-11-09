@@ -5,7 +5,7 @@ import torch
 from torch import Tensor
 
 from corpus import ALL_CHARS_FILE_NAME, GOOD_CHARS_FILE_NAME
-from util import DEFAULT_ENCODING
+from util import DEFAULT_ENCODING, INT_EMPTY
 
 
 def get_line(file_path: str, byte_index: int) -> str:
@@ -31,7 +31,7 @@ def text_to_tensor(text: str, all_chars: str) -> Tensor:
     tensor_out = torch.empty(len(text), dtype=torch.long)
     for i, index in enumerate(all_chars.find(char) for char in text):
         if index == -1:  # if char is not found (unknown), `find` gives -1
-            tensor_out[i] = unknown_index
+            tensor_out[i] = unknown_index  # TODO
         else:  # regular char
             tensor_out[i] = index
     return tensor_out
@@ -45,7 +45,7 @@ def collate_single_column(data: Iterable[Tensor]) -> Tensor:
         # does it need padding?
         x_len_diff = x_size - x.shape[0]
         if x_len_diff > 0:
-            x_stack.append(torch.cat([x, torch.full((x_len_diff,), -1)], dim=0))
+            x_stack.append(torch.cat([x, torch.full((x_len_diff,), INT_EMPTY)], dim=0))
         else:
             x_stack.append(x)
     x_batch = torch.stack(x_stack, dim=1)  # sequence first, batch second
