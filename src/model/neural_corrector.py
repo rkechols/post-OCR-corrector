@@ -58,7 +58,7 @@ class NeuralCorrector(pl.LightningModule):
         self.linear_stack = nn.Sequential(
             nn.Linear(d_model, d_model),
             nn.ReLU(),
-            nn.Linear(d_model, self.vocab_size - 1)  # -1 because we won't generate padding (but yes UNK and bookend)
+            nn.Linear(d_model, self.vocab_size)
         )
         self.criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
         self.lr = lr
