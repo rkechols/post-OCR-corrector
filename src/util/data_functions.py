@@ -66,3 +66,12 @@ def get_alphabet(data_dir: str, only_select_chars: bool = False) -> str:
     with open(os.path.join(data_dir, char_file_name), "r", encoding=DEFAULT_ENCODING) as chars_file:
         all_chars = chars_file.read().replace("\n", "")  # \n is never in the alphabet, but it may be in the file if they put it on multiple lines
     return all_chars
+
+
+def get_whitespace_indices(data_dir: str) -> Set[int]:
+    alphabet = get_alphabet(data_dir)
+    to_return = set()
+    for index, char in enumerate(alphabet):
+        if char.isspace():
+            to_return.add(index)
+    return to_return
