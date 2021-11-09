@@ -1,7 +1,7 @@
 import argparse
-from math import ceil
 import os
 import sys
+from math import ceil
 from typing import List, Tuple
 
 import pytorch_lightning as pl
@@ -132,8 +132,9 @@ class NeuralCorrector(pl.LightningModule):
                     batch_tensors = [text_to_tensor(text, self.alphabet) for text in in_chunks]  # turn each chunk into a tensor
                     out = self(collate_single_column(batch_tensors).to(self.device))  # stack the tensors into a batch tensor and put the batch through the model
                     out = self.tensor_to_texts(out)  # convert the tensor to a list of output strings
-                    for i, out_text in enumerate(out):  # put each chunk into the appropriate list with other chunks of the same sequence
-                        out_texts_chunks[i].append(out_text)
+                    for i, (in_text, out_text) in enumerate(zip(in_chunks, out)):  # put each chunk into the appropriate list with other chunks of the same sequence
+                        if in_text != "":  # but skip ones where the input has already ran out
+                            out_texts_chunks[i].append(out_text)
                 to_return += ["".join(chunks) for chunks in out_texts_chunks]  # turn each list of chunks into a full output sequence
                 next_text += self.batch_size
         return to_return
@@ -239,6 +240,8 @@ if __name__ == "__main__":
     model.to(device_)
     model.eval()
 
+    print("using untrained model as plain corrector...")
+    print("-------")
     test_in = [
         "This is a thing. " * 32,
         "Super short sentence, nothing else.",
@@ -261,14 +264,14 @@ if __name__ == "__main__":
             print(f"input tensor shape/type: {batch_[0].shape}/{batch_[0].dtype}")
             print(f"output tensor shape/type: {batch_[1].shape}/{batch_[1].dtype}")
             # try both functions
-            print("starting to run things through the model...")
+            print("starting to run raw tensors through the model...")
             loss_ = model.validation_step(batch_, 0)
             print(f"{loss_=}")
             output = model(batch_[0])
             print(f"{output=}")
             # interpret output as a batch of strings
-            texts_out = model.tensor_to_texts(output)
             print("\nGenerated outputs from untrained model:")
+            texts_out = model.tensor_to_texts(output)
             for i_, s in enumerate(texts_out):
                 print(f"\nOutput sequence {i_}: {s}")
                 print(f"(Length: {len(s)})")
