@@ -5,8 +5,9 @@ from enum import auto, Enum
 
 from tqdm import tqdm
 
-from corpus import CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, GOOD_CHARS_FILE_NAME
+from corpus import CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME
 from util import DEFAULT_ENCODING
+from util.data_functions import get_alphabet
 
 
 class EditType(Enum):
@@ -68,11 +69,8 @@ if __name__ == "__main__":
     corpus_dir = args.corpus_dir
 
     corpus_path = os.path.join(corpus_dir, CORPUS_PLAIN_FILE_NAME)
-    good_chars_path = os.path.join(corpus_dir, GOOD_CHARS_FILE_NAME)
 
-    with open(good_chars_path, "r", encoding=DEFAULT_ENCODING) as good_chars_file:
-        good_chars_ = good_chars_file.read()
-    good_chars_ = good_chars_.replace("\n", "")  # \n is never a "good char", but it may be in the file if they put it on multiple lines
+    good_chars_ = get_alphabet(corpus_dir, only_select_chars=True)
 
     print(f"Creating a mutilated/messy version of {corpus_path}")
 

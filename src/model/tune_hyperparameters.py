@@ -12,10 +12,10 @@ from ray.tune import CLIReporter
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 from ray.tune.schedulers import ASHAScheduler
 
-from corpus import ALL_CHARS_FILE_NAME
 from model import HYPERPARAMS_FILE_NAME
 from model.neural_corrector import NeuralCorrector
 from util import DEFAULT_ENCODING
+from util.data_functions import get_alphabet
 
 
 def train_mini(config, data_dir: str, alphabet_size: int,
@@ -59,8 +59,7 @@ if __name__ == "__main__":
         cpus_per_trial = int(cpus_per_trial)
     os.makedirs(model_dir, exist_ok=True)
 
-    with open(os.path.join(corpus_dir, ALL_CHARS_FILE_NAME), "r", encoding=DEFAULT_ENCODING) as chars_file:
-        all_chars = chars_file.read().replace("\n", "")
+    all_chars = get_alphabet(corpus_dir)
     alphabet_size_ = len(all_chars)
 
     ray.init(num_cpus=cpus_, num_gpus=gpus_)

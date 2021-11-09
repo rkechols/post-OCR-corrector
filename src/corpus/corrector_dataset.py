@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 from corpus import ALL_CHARS_FILE_NAME, CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, SPLIT_FILE_NAME
 from corpus.make_split_csv import BYTE_INDEX_CLEAN_STR, BYTE_INDEX_MESSY_STR, SPLIT_CSV_HEADER, SPLIT_NAMES, SPLIT_STR
 from util import DEFAULT_ENCODING
-from util.data_functions import get_line, text_to_tensor
+from util.data_functions import get_alphabet, get_line, text_to_tensor
 
 
 class CorrectorDataset(Dataset):
@@ -27,8 +27,7 @@ class CorrectorDataset(Dataset):
                 if row[SPLIT_STR] == split:
                     byte_indices.append((int(row[BYTE_INDEX_CLEAN_STR]), int(row[BYTE_INDEX_MESSY_STR])))
         self.byte_indices = np.array(byte_indices)  # numpy array so that when the dataset is copied by the workers, it doesn't copy this whole array at every access
-        with open(os.path.join(data_dir, ALL_CHARS_FILE_NAME), "r", encoding=DEFAULT_ENCODING) as chars_file:
-            self._all_chars = chars_file.read().replace("\n", "")
+        self._all_chars = get_alphabet(data_dir)
         self.tensors_out = tensors_out
 
     @property

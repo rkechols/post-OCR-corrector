@@ -1,8 +1,10 @@
-from typing import List, Tuple
+import os
+from typing import List, Set, Tuple
 
 import torch
 from torch import Tensor
 
+from corpus import ALL_CHARS_FILE_NAME, GOOD_CHARS_FILE_NAME
 from util import DEFAULT_ENCODING
 
 
@@ -57,3 +59,10 @@ def collate_sequences(data_pairs: List[Tuple[Tensor, Tensor]]) -> Tuple[Tensor, 
     x_batch = torch.stack(x_stack, dim=1)  # sequence first, batch second
     y_batch = torch.stack(y_stack, dim=1)
     return x_batch, y_batch
+
+
+def get_alphabet(data_dir: str, only_select_chars: bool = False) -> str:
+    char_file_name = GOOD_CHARS_FILE_NAME if only_select_chars else ALL_CHARS_FILE_NAME
+    with open(os.path.join(data_dir, char_file_name), "r", encoding=DEFAULT_ENCODING) as chars_file:
+        all_chars = chars_file.read().replace("\n", "")  # \n is never in the alphabet, but it may be in the file if they put it on multiple lines
+    return all_chars

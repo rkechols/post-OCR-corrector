@@ -16,7 +16,7 @@ from corpus import CORPUS_PLAIN_FILE_NAME, GOOD_CHARS_FILE_NAME, SPLIT_FILE_NAME
 from corpus.corrector_dataset import CorrectorDataset
 from corpus.make_split_csv import BYTE_INDEX_CLEAN_STR, SPLIT_CSV_HEADER, SPLIT_STR
 from util import DEFAULT_ENCODING
-from util.data_functions import get_line
+from util.data_functions import get_alphabet, get_line
 from util.edit_distance import edit_distance
 
 
@@ -198,8 +198,7 @@ if __name__ == "__main__":
     models_dir = os.path.join("data", "models", "dictionary_corrector")
 
     # get good chars
-    with open(os.path.join(corpus_dir, GOOD_CHARS_FILE_NAME), "r", encoding=DEFAULT_ENCODING) as chars_file:
-        good_chars_ = chars_file.read().replace("\n", "")  # these chars will be used to generate edits
+    good_chars_ = get_alphabet(corpus_dir, only_select_chars=True)  # these chars will be used to generate edits
 
     dataset_train = DictionaryCorrectorDataset(corpus_dir, split="train")
     corrector = DictionaryCorrector(min_frequency=1, good_chars=good_chars_)
