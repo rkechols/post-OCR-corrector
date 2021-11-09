@@ -63,7 +63,7 @@ class NeuralCorrector(pl.LightningModule):
         if x.shape[0] > self.max_len:
             print(f"WARNING: truncating input sequence to length {self.max_len}", file=sys.stderr)
             x = x[:self.max_len, :]
-        batch_size = x.shape[1]  # 0 = sequence, 1 = batch
+        in_length, batch_size = x.shape
         device = self.device
         x_padding_mask = torch.where(x == -1, True, False)  # get padding mask for the input sequence
         x[x_padding_mask] = self.pad_index  # convert any -1 to the actual padding index
@@ -93,6 +93,8 @@ class NeuralCorrector(pl.LightningModule):
             new_thing[terminated] = self.pad_index
             # actually add the new thing to the sequence
             sequence = torch.cat([sequence, new_thing.unsqueeze(0)], dim=0)
+            if sequence.shape[0] > 2 * in_length:  # unreasonably long; force stop generating
+                break
             # also update the padding mask, remembering that the mask is transposed
             sequence_padding_mask = torch.cat([sequence_padding_mask, torch.where(new_thing == self.pad_index, True, False).unsqueeze(1)], dim=1)
         sequence = sequence[1:, :]  # chop off the starting bookend
