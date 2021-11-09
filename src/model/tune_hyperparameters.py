@@ -53,10 +53,10 @@ if __name__ == "__main__":
 
     gpus_per_trial = gpus_ / n_concurrent
     if gpus_per_trial > 1:
-        gpus_per_trial = round(gpus_per_trial)
+        gpus_per_trial = int(gpus_per_trial)
     cpus_per_trial = cpus_ / n_concurrent
     if cpus_per_trial > 1:
-        cpus_per_trial = round(cpus_per_trial)
+        cpus_per_trial = int(cpus_per_trial)
     os.makedirs(model_dir, exist_ok=True)
 
     with open(os.path.join(corpus_dir, ALL_CHARS_FILE_NAME), "r", encoding=DEFAULT_ENCODING) as chars_file:
@@ -65,7 +65,6 @@ if __name__ == "__main__":
 
     ray.init(num_cpus=cpus_, num_gpus=gpus_)
     print(f"ray cluster: {ray.cluster_resources()}")
-    exit(0)
 
     search_space = {
         "d_model": tune.choice([128, 256, 512]),
