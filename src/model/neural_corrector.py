@@ -139,7 +139,7 @@ class NeuralCorrector(pl.LightningModule):
         return loss
 
     def validation_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int) -> Tensor:
-        loss = self.forward_with_target(*batch)
+        loss = self.forward_with_target(*batch).detach()  # detaching lets us free more memory (we don't need it since we aren't training)
         return loss
 
     def validation_epoch_end(self, val_losses: List[Tensor]):

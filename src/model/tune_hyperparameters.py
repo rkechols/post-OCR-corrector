@@ -21,14 +21,13 @@ from util import DEFAULT_ENCODING
 def train_mini(config, data_dir: str, alphabet_size: int,
                num_cpus: float = 1, num_gpus: float = 0,
                checkpoint_dir: str = None):
-    # model = NeuralCorrector(data_dir, alphabet_size, ceil(num_cpus), **config)
-    model = NeuralCorrector(data_dir, alphabet_size, 0, **config)
+    model = NeuralCorrector(data_dir, alphabet_size, ceil(num_cpus), **config)
     trainer = pl.Trainer(
         max_epochs=1,
         val_check_interval=100,
         gpus=ceil(num_gpus),  # if fractional GPUs passed in, convert to int
         logger=TensorBoardLogger(save_dir=tune.get_trial_dir(), name="", version="."),
-        enable_progress_bar=False,
+        progress_bar_refresh_rate=0,
         callbacks=[
             TuneReportCallback({"loss": "ptl/val_loss"}, on="validation_end")
         ],
@@ -43,16 +42,21 @@ if __name__ == "__main__":
     arg_parser.add_argument("--gpus", type=int, default=torch.cuda.device_count(), help="Max number of GPUs to use (defaults to no limit).")
     arg_parser.add_argument("--cpus", type=int, default=os.cpu_count(), help="Max number of CPU processors to use (defaults to no limit).")
     arg_parser.add_argument("--n-concurrent", type=int, default=4, help="Number of trials to run simultaneously.")
+    arg_parser.add_argument("--n-total", type=int, default=20, help="Total number of trials to run.")
     args = arg_parser.parse_args()
     corpus_dir = args.corpus_dir
     model_dir = args.model_dir
     gpus_ = args.gpus
     cpus_ = args.cpus
     n_concurrent = args.n_concurrent
+    n_total = args.n_total
 
     gpus_per_trial = gpus_ / n_concurrent
+    if gpus_per_trial > 1:
+        gpus_per_trial = round(gpus_per_trial)
     cpus_per_trial = cpus_ / n_concurrent
-
+    if cpus_per_trial > 1:
+        cpus_per_trial = round(cpus_per_trial)
     os.makedirs(model_dir, exist_ok=True)
 
     with open(os.path.join(corpus_dir, ALL_CHARS_FILE_NAME), "r", encoding=DEFAULT_ENCODING) as chars_file:
@@ -61,6 +65,7 @@ if __name__ == "__main__":
 
     ray.init(num_cpus=cpus_, num_gpus=gpus_)
     print(f"ray cluster: {ray.cluster_resources()}")
+    exit(0)
 
     search_space = {
         "d_model": tune.choice([128, 256, 512]),
@@ -74,7 +79,13 @@ if __name__ == "__main__":
     }
 
     analysis = tune.run(
-        tune.with_parameters(train_mini, data_dir=corpus_dir, alphabet_size=alphabet_size_, num_cpus=cpus_per_trial, num_gpus=gpus_per_trial),
+        tune.with_parameters(
+            train_mini,
+            data_dir=os.path.abspath(corpus_dir),  # needs full path, apparently
+            alphabet_size=alphabet_size_,
+            num_cpus=cpus_per_trial,
+            num_gpus=gpus_per_trial
+        ),
         resources_per_trial={
             "cpu": cpus_per_trial,
             "gpu": gpus_per_trial
@@ -82,6 +93,7 @@ if __name__ == "__main__":
         metric="loss",
         mode="min",
         config=search_space,
+        num_samples=n_total,
         scheduler=ASHAScheduler(
             time_attr="training_iteration",
             max_t=1000,
