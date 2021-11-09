@@ -18,10 +18,10 @@ from util import DEFAULT_ENCODING
 from util.data_functions import get_alphabet
 
 
-def train_mini(config, data_dir: str, alphabet_size: int,
+def train_mini(config, data_dir: str,
                num_cpus: float = 1, num_gpus: float = 0,
                checkpoint_dir: str = None):
-    model = NeuralCorrector(data_dir, alphabet_size, ceil(num_cpus), **config)
+    model = NeuralCorrector(data_dir, ceil(num_cpus), **config)
     trainer = pl.Trainer(
         max_epochs=1,
         val_check_interval=100,
@@ -80,7 +80,6 @@ if __name__ == "__main__":
         tune.with_parameters(
             train_mini,
             data_dir=os.path.abspath(corpus_dir),  # needs full path, apparently
-            alphabet_size=alphabet_size_,
             num_cpus=cpus_per_trial,
             num_gpus=gpus_per_trial
         ),

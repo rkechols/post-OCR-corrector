@@ -11,11 +11,11 @@ from torch.utils.data import DataLoader
 
 from corpus.corrector_dataset import CorrectorDataset
 from model.positional_encoding import PositionalEncoding
-from util.data_functions import collate_sequences
+from util.data_functions import collate_sequences, collate_single_column, get_alphabet, text_to_tensor
 
 
 class NeuralCorrector(pl.LightningModule):
-    def __init__(self, data_dir: str, alphabet_size: int, cpus: int = None, max_len: int = 512,
+    def __init__(self, data_dir: str, cpus: int = None, max_len: int = 512,
                  d_model: int = 512,
                  n_head: int = 8,
                  n_encoder_layers: int = 6,
@@ -28,6 +28,8 @@ class NeuralCorrector(pl.LightningModule):
                  batch_size: int = 16):
         super().__init__()
         self.data_dir = data_dir
+        self.alphabet = get_alphabet(data_dir)
+        alphabet_size = len(self.alphabet)
         self.unk_index = alphabet_size
         self.bookend_index = alphabet_size + 1
         self.pad_index = alphabet_size + 2
@@ -100,6 +102,34 @@ class NeuralCorrector(pl.LightningModule):
         sequence = sequence[1:, :]  # chop off the starting bookend
         sequence = torch.where(sequence == self.pad_index, -1, sequence)  # convert any padding to -1
         return sequence
+
+    def tensor_to_texts(self, t: Tensor) -> List[str]:
+        to_return = list()
+        for i in range(t.shape[1]):  # each sequence in the batch
+            sequence = list()
+            for j in range(t.shape[0]):
+                char_index = t[j, i].item()
+                if char_index == -1:
+                    break
+                sequence.append(self.alphabet[char_index])
+            sequence_str = "".join(sequence)
+            to_return.append(sequence_str)
+        return to_return
+
+    def correct(self, texts: List[str]) -> List[str]:
+        to_return = list()
+        next_text = 0
+        n = len(texts)
+        self.eval()
+        with torch.no_grad():
+            while next_text < n:
+                batch_range = range(next_text, min(next_text + self.batch_size, n))
+                batch = collate_single_column(iter(text_to_tensor(texts[i], self.alphabet) for i in batch_range))
+                batch = batch.to(self.device)
+                out = self(batch)
+                to_return += self.tensor_to_texts(out)
+                next_text += self.batch_size
+        return to_return
 
     def forward_with_target(self, x: Tensor, y: Tensor) -> Tensor:
         if x.shape[0] > self.max_len:
@@ -200,7 +230,7 @@ if __name__ == "__main__":
 
     dataset = CorrectorDataset(corpus_dir, split="validation", tensors_out=True)
     dataloader = DataLoader(dataset, batch_size=3, num_workers=cpus_, collate_fn=collate_sequences)
-    model = NeuralCorrector(corpus_dir, dataset.alphabet_size, cpus_)
+    model = NeuralCorrector(corpus_dir, cpus_)
     model.to(device_)
     model.eval()
     with torch.no_grad():
@@ -216,17 +246,10 @@ if __name__ == "__main__":
             print(f"{loss_=}")
             output = model(batch_[0])
             print(f"{output=}")
-            # interpret output as a string
+            # interpret output as a batch of strings
+            texts_out = model.tensor_to_texts(output)
             print("\nGenerated outputs from untrained model:")
-            alphabet = dataset.alphabet
-            for i_ in range(output.shape[1]):
-                sequence_ = list()
-                for j_ in range(output.shape[0]):
-                    char_index = output[j_, i_].item()
-                    if char_index == -1:
-                        break
-                    sequence_.append(alphabet[char_index])
-                sequence_str = "".join(sequence_)
-                print(f"\nOutput sequence {i_}: {sequence_str}")
-                print(f"(Length: {len(sequence_str)})")
+            for i_, s in enumerate(texts_out):
+                print(f"\nOutput sequence {i_}: {s}")
+                print(f"(Length: {len(s)})")
             break
