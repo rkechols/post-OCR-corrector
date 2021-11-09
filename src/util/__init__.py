@@ -1,2 +1,3 @@
 DEFAULT_ENCODING = "utf-8"
 INT_EMPTY = -1
+UNK = "\uFFFD"

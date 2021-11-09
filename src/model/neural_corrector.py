@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 
 from corpus.corrector_dataset import CorrectorDataset
 from model.positional_encoding import PositionalEncoding
-from util import INT_EMPTY
+from util import INT_EMPTY, UNK
 from util.data_functions import collate_sequences, collate_single_column, get_alphabet, text_to_tensor
 
 
@@ -32,6 +32,7 @@ class NeuralCorrector(pl.LightningModule):
         self.data_dir = data_dir
         self.alphabet = get_alphabet(data_dir)
         alphabet_size = len(self.alphabet)
+        # unk_index MUST be the first one after the valid alphabet indices because of how util.data_functions.text_to_tensor works
         self.unk_index = alphabet_size
         self.bookend_index = alphabet_size + 1
         self.pad_index = alphabet_size + 2
@@ -57,7 +58,7 @@ class NeuralCorrector(pl.LightningModule):
         self.linear_stack = nn.Sequential(
             nn.Linear(d_model, d_model),
             nn.ReLU(),
-            nn.Linear(d_model, self.vocab_size)
+            nn.Linear(d_model, self.vocab_size - 1)  # -1 because we won't generate padding (but yes UNK and bookend)
         )
         self.criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
         self.lr = lr
@@ -111,11 +112,15 @@ class NeuralCorrector(pl.LightningModule):
                 char_index = t[j, i].item()
                 if char_index == INT_EMPTY:
                     break
-                try:
-                    sequence.append(self.alphabet[char_index])
-                except IndexError:
-                    print(f"UNKNOWN INDEX: {char_index}", file=sys.stderr)
-                    sequence.append("<UNK>")
+                elif char_index == self.unk_index:
+                    char = UNK
+                else:
+                    try:
+                        char = self.alphabet[char_index]
+                    except IndexError:
+                        print(f"ERROR - unknown char index: {char_index} (max expected is {self.unk_index})", file=sys.stderr)
+                        char = UNK
+                sequence.append(char)
             sequence_str = "".join(sequence)
             to_return.append(sequence_str)
         return to_return
