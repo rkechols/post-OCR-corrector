@@ -53,8 +53,8 @@ def collate_single_column(data: Iterable[Tensor]) -> Tensor:
 
 
 def collate_sequences(data_pairs: List[Tuple[Tensor, Tensor]]) -> Tuple[Tensor, Tensor]:
-    x_batch = collate_single_column(iter(x for x, _ in data_pairs))
-    y_batch = collate_single_column(iter(y for _, y in data_pairs))
+    x_batch = collate_single_column([x for x, _ in data_pairs])
+    y_batch = collate_single_column([y for _, y in data_pairs])
     return x_batch, y_batch
 
 
