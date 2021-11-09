@@ -1,4 +1,5 @@
 import argparse
+from math import ceil
 import os
 import sys
 from typing import List, Tuple
@@ -77,7 +78,7 @@ class NeuralCorrector(pl.LightningModule):
         terminated = torch.zeros(batch_size, device=device).bool()  # keep track of which sequences have finished
         # make a padding mask that will grow with the sequence
         sequence_padding_mask = torch.zeros((batch_size, 1), device=device).bool()  # the mask is transposed the whole time
-        while True:
+        while sequence.shape[0] <= 2 * in_length:  # stop generating when it gets unreasonably long
             # turn indices into embeddings and generate one more token
             if sequence.shape[0] > self.max_len:  # too long; give only the last `max_len` tokens
                 sequence_embed = self.positional_encoding(self.embedding_tgt(sequence[-self.max_len:, :]))
@@ -95,8 +96,6 @@ class NeuralCorrector(pl.LightningModule):
             new_thing[terminated] = self.pad_index
             # actually add the new thing to the sequence
             sequence = torch.cat([sequence, new_thing.unsqueeze(0)], dim=0)
-            if sequence.shape[0] > 2 * in_length:  # unreasonably long; force stop generating
-                break
             # also update the padding mask, remembering that the mask is transposed
             sequence_padding_mask = torch.cat([sequence_padding_mask, torch.where(new_thing == self.pad_index, True, False).unsqueeze(1)], dim=1)
         sequence = sequence[1:, :]  # chop off the starting bookend
@@ -123,11 +122,19 @@ class NeuralCorrector(pl.LightningModule):
         self.eval()
         with torch.no_grad():
             while next_text < n:
-                batch_range = range(next_text, min(next_text + self.batch_size, n))
-                batch = collate_single_column(iter(text_to_tensor(texts[i], self.alphabet) for i in batch_range))
-                batch = batch.to(self.device)
-                out = self(batch)
-                to_return += self.tensor_to_texts(out)
+                batch_texts = texts[next_text:(next_text + self.batch_size)]
+                longest = max(len(x) for x in batch_texts)
+                out_texts_chunks = [list() for _ in range(len(batch_texts))]
+                for chunk_num in range(ceil(longest / self.max_len)):
+                    chunk_start = chunk_num * self.max_len
+                    chunk_end = chunk_start + self.max_len
+                    in_chunks = [text[chunk_start:chunk_end] for text in batch_texts]  # get the relevant chunk of each text in the batch
+                    batch_tensors = [text_to_tensor(text, self.alphabet) for text in in_chunks]  # turn each chunk into a tensor
+                    out = self(collate_single_column(batch_tensors).to(self.device))  # stack the tensors into a batch tensor and put the batch through the model
+                    out = self.tensor_to_texts(out)  # convert the tensor to a list of output strings
+                    for i, out_text in enumerate(out):  # put each chunk into the appropriate list with other chunks of the same sequence
+                        out_texts_chunks[i].append(out_text)
+                to_return += ["".join(chunks) for chunks in out_texts_chunks]  # turn each list of chunks into a full output sequence
                 next_text += self.batch_size
         return to_return
 
@@ -228,11 +235,24 @@ if __name__ == "__main__":
     if cpus_ == 1:
         cpus_ = 0  # DataLoader expects 0 if we're not doing extra workers
 
-    dataset = CorrectorDataset(corpus_dir, split="validation", tensors_out=True)
-    dataloader = DataLoader(dataset, batch_size=3, num_workers=cpus_, collate_fn=collate_sequences)
     model = NeuralCorrector(corpus_dir, cpus_)
     model.to(device_)
     model.eval()
+
+    test_in = [
+        "This is a thing. " * 32,
+        "Super short sentence, nothing else.",
+        "This one is going to be crazy long. " * 40
+    ]
+    test_out = model.correct(test_in)
+    for in_str, out_str in zip(test_in, test_out):
+        print(f"INPUT:  {in_str}")
+        print(f"OUTPUT: {out_str}")
+        print("-------")
+
+    dataset = CorrectorDataset(corpus_dir, split="validation", tensors_out=True)
+    dataloader = DataLoader(dataset, batch_size=3, num_workers=cpus_, collate_fn=collate_sequences)
+
     with torch.no_grad():
         for batch_ in dataloader:
             if try_long and batch_[0].shape[0] <= model.max_len and batch_[1].shape[0] < model.max_len:
