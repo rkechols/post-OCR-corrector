@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+from math import ceil
 from typing import List, Tuple
 
 import pytorch_lightning as pl
@@ -59,23 +60,45 @@ class NeuralCorrector(pl.LightningModule):
         self.lr = lr
         self.batch_size = batch_size
 
-    def forward(self, x: Tensor) -> Tensor:
-        device = self.device
-        # TODO: max sequence length?
-        batch_size = x.shape[1]  # 0 = sequence, 1 = batch
-        x_padding_mask = torch.where(x == -1, True, False)  # get padding mask for the input sequence
-        x[x_padding_mask] = self.pad_index  # convert any -1 to the actual padding index
+    def _context(self, x: Tensor, x_padding_mask: Tensor) -> Tensor:
         x = self.positional_encoding(self.embedding_src(x.detach()))  # detach is so we don't need to back-prop through the data prep
         # put the input sequence into the encoder to get the "context"/"memory" sequence
         x = self.transformer.encoder(x, src_key_padding_mask=torch.permute(x_padding_mask, (1, 0)))
+        return x
+
+    def forward(self, x: Tensor) -> Tensor:
+        device = self.device
+        batch_size = x.shape[1]  # 0 = sequence, 1 = batch
+        x_padding_mask = torch.where(x == -1, True, False)  # get padding mask for the input sequence
+        x[x_padding_mask] = self.pad_index  # convert any -1 to the actual padding index
+        # put x through the encoder to get context/memory (but check sequence length)
+        if x.shape[0] <= self.max_len:
+            x = self._context(x, x_padding_mask)
+        else:  # too long; chop it up
+            n_chunks = 2  # how many pieces to chop into
+            while (x_chunk_size := ceil(x.shape[0] / n_chunks)) > self.max_len:
+                n_chunks += 1
+            # one chunk at a time
+            to_cat = list()
+            for chunk_index in range(n_chunks):
+                x_chunk = x[(chunk_index * x_chunk_size):((chunk_index + 1) * x_chunk_size), :]
+                padding_chunk = x_padding_mask[(chunk_index * x_chunk_size):((chunk_index + 1) * x_chunk_size), :]
+                x_context = self._context(x_chunk, padding_chunk)
+                to_cat.append(x_context)
+            x = torch.cat(to_cat, dim=0)
         # make a sequence to go in the decoder, gradually growing. starts with just a bookend
         sequence = torch.full((1, batch_size), self.bookend_index, dtype=torch.long, device=device)
         terminated = torch.zeros(batch_size, device=device).bool()  # keep track of which sequences have finished
         # make a padding mask that will grow with the sequence
         sequence_padding_mask = torch.zeros((batch_size, 1), device=device).bool()  # the mask is transposed the whole time
         while True:
-            sequence_embed = self.positional_encoding(self.embedding_tgt(sequence))  # turn indices into embeddings
-            new_thing = self.transformer.decoder(sequence_embed, x, tgt_key_padding_mask=sequence_padding_mask)[-1, :]  # only take the last token
+            # turn indices into embeddings and generate one more token
+            if sequence.shape[0] > self.max_len:  # too long; give only the last `max_len` tokens
+                sequence_embed = self.positional_encoding(self.embedding_tgt(sequence[-self.max_len:, :]))
+                new_thing = self.transformer.decoder(sequence_embed, x, tgt_key_padding_mask=sequence_padding_mask[:, -self.max_len])[-1, :]  # only take the last token
+            else:
+                sequence_embed = self.positional_encoding(self.embedding_tgt(sequence))
+                new_thing = self.transformer.decoder(sequence_embed, x, tgt_key_padding_mask=sequence_padding_mask)[-1, :]  # only take the last token
             new_thing = self.linear_stack(new_thing)
             new_thing = torch.argmax(new_thing, dim=-1)
             # update which sequences are done
@@ -86,16 +109,15 @@ class NeuralCorrector(pl.LightningModule):
             new_thing[terminated] = self.pad_index
             # actually add the new thing to the sequence
             sequence = torch.cat([sequence, new_thing.unsqueeze(0)], dim=0)
-            if sequence.shape[0] > self.max_len:  # no more room; stop generating
-                break  # TODO: do we want to do a sliding window to keep generating?
             # also update the padding mask, remembering that the mask is transposed
             sequence_padding_mask = torch.cat([sequence_padding_mask, torch.where(new_thing == self.pad_index, True, False).unsqueeze(1)], dim=1)
         sequence = sequence[1:, :]  # chop off the starting bookend
         sequence = torch.where(sequence == self.pad_index, -1, sequence)  # convert any padding to -1
         return sequence
 
-    def forward_with_target(self, x: Tensor, y: Tensor) -> Tensor:
-        # TODO: max sequence length?
+    def _forward_with_target_limited(self, x: Tensor, y: Tensor) -> Tensor:
+        assert x.shape[0] <= self.max_len, f"input sequence must be limited to length {self.max_len}"
+        assert y.shape[0] < self.max_len, f"input sequence must be limited to length {self.max_len - 1}"
         batch_size = x.shape[1]
         device = self.device
         # get padding masks
@@ -132,6 +154,21 @@ class NeuralCorrector(pl.LightningModule):
         # get the loss
         loss = self.criterion(y_hat, y_target)
         return loss
+
+    def forward_with_target(self, x: Tensor, y: Tensor) -> Tensor:
+        if x.shape[0] <= self.max_len and y.shape[0] < self.max_len:
+            return self._forward_with_target_limited(x, y)
+        # too long; chop them up
+        n_chunks = 2  # how many pieces to chop into
+        while (x_chunk_size := ceil(x.shape[0] / n_chunks)) > self.max_len or (y_chunk_size := ceil(y.shape[0] / n_chunks)) >= self.max_len:
+            n_chunks += 1
+        # one chunk at a time, accumulating loss
+        avg_loss = torch.tensor(0.0, device=self.device)
+        for chunk_index in range(n_chunks):
+            x_chunk = x[(chunk_index * x_chunk_size):((chunk_index + 1) * x_chunk_size), :]
+            y_chunk = y[(chunk_index * y_chunk_size):((chunk_index + 1) * y_chunk_size), :]
+            avg_loss += self._forward_with_target_limited(x_chunk, y_chunk)
+        return avg_loss
 
     def training_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int) -> Tensor:
         loss = self.forward_with_target(*batch)
@@ -189,6 +226,8 @@ if __name__ == "__main__":
     model = NeuralCorrector(corpus_dir, dataset.alphabet_size, cpus_)
     model.to(device_)
     for batch_ in dataloader:
+        if batch_[0].shape[0] <= 512 and batch_[1].shape[0] < 512:
+            continue
         batch_ = (batch_[0].to(device_), batch_[1].to(device_))
         print(f"input tensor shape/type: {batch_[0].shape}/{batch_[0].dtype}")
         print(f"output tensor shape/type: {batch_[1].shape}/{batch_[1].dtype}")
