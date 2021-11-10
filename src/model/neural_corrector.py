@@ -199,12 +199,9 @@ class NeuralCorrector(pl.LightningModule):
         return loss
 
     def validation_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int) -> Tensor:
-        loss = self.forward_with_target(*batch).detach()  # detaching lets us free more memory (we don't need it since we aren't training)
+        loss = self.forward_with_target(*batch)
+        self.log("ptl/val_loss", loss)
         return loss
-
-    def validation_epoch_end(self, val_losses: List[Tensor]):
-        avg_loss = torch.stack(val_losses).mean()
-        self.log("ptl/val_loss", avg_loss)
 
     def train_dataloader(self) -> DataLoader:
         dataset_train = CorrectorDataset(self.data_dir, split="train", tensors_out=True)
@@ -275,7 +272,7 @@ if __name__ == "__main__":
             print(f"output tensor shape/type: {batch_[1].shape}/{batch_[1].dtype}")
             # try both functions
             print("starting to run raw tensors through the model...")
-            loss_ = model.validation_step(batch_, 0)
+            loss_ = model.training_step(batch_, 0)
             print(f"{loss_=}")
             output = model(batch_[0])
             print(f"{output=}")
