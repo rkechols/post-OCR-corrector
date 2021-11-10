@@ -24,7 +24,8 @@ def train_mini(config, data_dir: str,
     model = NeuralCorrector(data_dir, ceil(num_cpus), **config)
     trainer = pl.Trainer(
         max_epochs=1,
-        val_check_interval=100,
+        val_check_interval=200,
+        limit_val_batches=20,
         gpus=ceil(num_gpus),  # if fractional GPUs passed in, convert to int
         logger=TensorBoardLogger(save_dir=tune.get_trial_dir(), name="", version="."),
         progress_bar_refresh_rate=0,
@@ -93,8 +94,8 @@ if __name__ == "__main__":
         num_samples=n_total,
         scheduler=ASHAScheduler(
             time_attr="training_iteration",
-            max_t=1000,
-            grace_period=25,
+            max_t=10_000,
+            grace_period=200,
             reduction_factor=2
         ),
         progress_reporter=CLIReporter(
