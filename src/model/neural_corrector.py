@@ -26,7 +26,7 @@ class NeuralCorrector(pl.LightningModule):
                  layer_norm_eps: float = 1e-5,
                  label_smoothing: float = 0.0,
                  lr: float = 4e-3,
-                 batch_size: int = 8):
+                 batch_size: int = 4):
         super().__init__()
         self.data_dir = data_dir
         self.alphabet = get_alphabet(data_dir)
