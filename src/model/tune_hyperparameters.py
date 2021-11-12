@@ -23,15 +23,18 @@ def train_mini(config, data_dir: str,
                checkpoint_dir: str = None):
     model = NeuralCorrector(data_dir, ceil(num_cpus), **config)
     trainer = pl.Trainer(
-        max_epochs=1,
-        val_check_interval=200,
-        limit_val_batches=20,
-        gpus=ceil(num_gpus),  # if fractional GPUs passed in, convert to int
         logger=TensorBoardLogger(save_dir=tune.get_trial_dir(), name="", version="."),
-        progress_bar_refresh_rate=0,
         callbacks=[
             TuneReportCallback({"loss": "ptl/val_loss"}, on="validation_end")
         ],
+        gradient_clip_val=0.5,
+        gpus=ceil(num_gpus),  # if fractional GPUs passed in, convert to int
+        progress_bar_refresh_rate=0,
+        max_epochs=1,
+        limit_val_batches=20,
+        val_check_interval=200,
+        num_sanity_val_steps=0,
+        terminate_on_nan=True
     )
     trainer.fit(model)
 
@@ -69,8 +72,7 @@ if __name__ == "__main__":
     search_space = {
         "d_model": tune.choice([128, 256, 512]),
         "n_head": tune.choice([4, 8]),
-        "n_encoder_layers": tune.choice(list(range(3, 7))),
-        "n_decoder_layers": tune.choice(list(range(3, 7))),
+        "n_layers": tune.choice(list(range(3, 7))),
         "d_linear": tune.choice([256, 512, 1024, 2048]),
         "dropout": tune.choice([0.0, 0.05, 0.1, 0.3]),
         "layer_norm_eps": tune.loguniform(1e-6, 1e-4),

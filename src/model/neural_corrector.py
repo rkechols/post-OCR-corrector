@@ -20,14 +20,13 @@ class NeuralCorrector(pl.LightningModule):
     def __init__(self, data_dir: str, cpus: int = None, max_len: int = 512,
                  d_model: int = 512,
                  n_head: int = 8,
-                 n_encoder_layers: int = 6,
-                 n_decoder_layers: int = 6,
+                 n_layers: int = 6,
                  d_linear: int = 2048,
                  dropout: float = 0.1,
                  layer_norm_eps: float = 1e-5,
                  label_smoothing: float = 0.0,
                  lr: float = 4e-3,
-                 batch_size: int = 16):
+                 batch_size: int = 8):
         super().__init__()
         self.data_dir = data_dir
         self.alphabet = get_alphabet(data_dir)
@@ -48,8 +47,8 @@ class NeuralCorrector(pl.LightningModule):
         self.transformer = nn.Transformer(
             d_model=d_model,
             nhead=n_head,
-            num_encoder_layers=n_encoder_layers,
-            num_decoder_layers=n_decoder_layers,
+            num_encoder_layers=n_layers,
+            num_decoder_layers=n_layers,
             dim_feedforward=d_linear,
             dropout=dropout,
             layer_norm_eps=layer_norm_eps,
