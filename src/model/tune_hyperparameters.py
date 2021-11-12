@@ -73,7 +73,7 @@ if __name__ == "__main__":
     search_space = {
         "d_model": tune.choice([128, 256, 512]),
         "n_head": tune.choice([4, 8]),
-        "n_layers": tune.choice(list(range(3, 7))),
+        "n_layers": tune.choice(list(range(4, 7))),
         "d_linear": tune.choice([256, 512, 1024, 2048]),
         "dropout": tune.choice([0.0, 0.05, 0.1, 0.3]),
         "layer_norm_eps": tune.loguniform(1e-6, 1e-4),
