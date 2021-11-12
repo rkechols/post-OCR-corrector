@@ -71,7 +71,7 @@ if __name__ == "__main__":
     print(f"ray cluster: {ray.cluster_resources()}")
 
     search_space = {
-        "d_model": tune.choice([128, 256, 512]),
+        "d_model": tune.choice([256, 512]),
         "n_head": tune.choice([4, 8]),
         "n_layers": tune.choice(list(range(4, 7))),
         "d_linear": tune.choice([256, 512, 1024, 2048]),
@@ -96,9 +96,9 @@ if __name__ == "__main__":
         config=search_space,
         num_samples=n_total,
         scheduler=ASHAScheduler(
-            time_attr="training_iteration",
-            max_t=2_000,
-            grace_period=200,
+            time_attr="training_iteration",  # TODO: is this the same as # of batches? or is it really what's shown in the CLIReporter?
+            max_t=50,
+            grace_period=5,
             reduction_factor=2
         ),
         progress_reporter=CLIReporter(
