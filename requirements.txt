@@ -1,3 +1,4 @@
+GPUtil==1.4.0
 numpy==1.21.3
 pytorch-lightning==1.4.9
 ray[default]==1.8.0

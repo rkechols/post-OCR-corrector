@@ -21,13 +21,14 @@ from util.data_functions import get_alphabet
 def train_mini(config, data_dir: str,
                num_cpus: float = 1, num_gpus: float = 0,
                checkpoint_dir: str = None):
+    tune.utils.wait_for_gpu(target_util=0.1, delay_s=2)
     model = NeuralCorrector(data_dir, ceil(num_cpus), **config)
     trainer = pl.Trainer(
         logger=TensorBoardLogger(save_dir=tune.get_trial_dir(), name="", version="."),
         callbacks=[
             TuneReportCallback({"loss": "ptl/val_loss"}, on="validation_end")
         ],
-        gradient_clip_val=0.5,
+        gradient_clip_val=0.25,
         gpus=ceil(num_gpus),  # if fractional GPUs passed in, convert to int
         progress_bar_refresh_rate=0,
         max_epochs=1,
@@ -96,7 +97,7 @@ if __name__ == "__main__":
         num_samples=n_total,
         scheduler=ASHAScheduler(
             time_attr="training_iteration",
-            max_t=10_000,
+            max_t=2_000,
             grace_period=200,
             reduction_factor=2
         ),
