@@ -59,7 +59,8 @@ class NeuralCorrector(pl.LightningModule):
             nn.ReLU(),
             nn.Linear(d_model, self.vocab_size)
         )
-        self.criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+        # self.nll_loss = nn.NLLLoss()
+        self.cross_entropy_loss = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
         self.lr = lr
         self.batch_size = batch_size
 
@@ -69,24 +70,21 @@ class NeuralCorrector(pl.LightningModule):
             x = x[:self.max_len, :]
         in_length, batch_size = x.shape
         device = self.device
-        x_padding_mask = torch.where(x == INT_EMPTY, True, False)  # get padding mask for the input sequence
-        x[x_padding_mask] = self.pad_index  # convert any INT_EMPTY to the actual padding index
+        x = torch.where(x == INT_EMPTY, self.pad_index, x)  # convert any INT_EMPTY to the actual padding index
         x = self.positional_encoding(self.embedding_src(x.detach()))  # detach is so we don't need to back-prop through the data prep
         # put the input sequence into the encoder to get the "context"/"memory" sequence
-        x = self.transformer.encoder(x, src_key_padding_mask=torch.permute(x_padding_mask, (1, 0)))
+        x = self.transformer.encoder(x)
         # make a sequence to go in the decoder, gradually growing. starts with just a bookend
         sequence = torch.full((1, batch_size), self.bookend_index, dtype=torch.long, device=device)
         terminated = torch.zeros(batch_size, device=device).bool()  # keep track of which sequences have finished
-        # make a padding mask that will grow with the sequence
-        sequence_padding_mask = torch.zeros((batch_size, 1), device=device).bool()  # the mask is transposed the whole time
         while sequence.shape[0] <= 2 * in_length:  # stop generating when it gets unreasonably long
-            # turn indices into embeddings and generate one more token
+            # turn indices into embeddings
             if sequence.shape[0] > self.max_len:  # too long; give only the last `max_len` tokens
                 sequence_embed = self.positional_encoding(self.embedding_tgt(sequence[-self.max_len:, :]))
-                new_thing = self.transformer.decoder(sequence_embed, x, tgt_key_padding_mask=sequence_padding_mask[:, -self.max_len:])[-1, :]  # only take the last token
             else:
                 sequence_embed = self.positional_encoding(self.embedding_tgt(sequence))
-                new_thing = self.transformer.decoder(sequence_embed, x, tgt_key_padding_mask=sequence_padding_mask)[-1, :]  # only take the last token
+            # generate one more token
+            new_thing = self.transformer.decoder(sequence_embed, x)[-1, :]  # generates a whole sequence, but we only take the last token
             new_thing = self.linear_stack(new_thing)
             new_thing = torch.argmax(new_thing, dim=-1)
             # update which sequences are done
@@ -97,8 +95,6 @@ class NeuralCorrector(pl.LightningModule):
             new_thing[terminated] = self.pad_index
             # actually add the new thing to the sequence
             sequence = torch.cat([sequence, new_thing.unsqueeze(0)], dim=0)
-            # also update the padding mask, remembering that the mask is transposed
-            sequence_padding_mask = torch.cat([sequence_padding_mask, torch.where(new_thing == self.pad_index, True, False).unsqueeze(1)], dim=1)
         sequence = sequence[1:, :]  # chop off the starting bookend
         sequence = torch.where(sequence == self.pad_index, INT_EMPTY, sequence)  # convert any padding to INT_EMPTY
         return sequence
@@ -148,6 +144,16 @@ class NeuralCorrector(pl.LightningModule):
                 next_text += self.batch_size
         return to_return
 
+    # def cross_entropy_loss(self, y_hat_: Tensor, y_target: Tensor) -> Tensor:
+    #     # CrossEntropyLoss(x) = NLLLoss(log(softmax(x)))
+    #     y_hat = torch.softmax(y_hat_, dim=1)
+    #     # make sure we don't have a 0.0 going into log
+    #     epsilon = torch.tensor(1e-10, device=self.device)
+    #     y_hat = torch.where(y_hat < epsilon, epsilon, y_hat)
+    #     y_hat = torch.log(y_hat)
+    #     loss = self.nll_loss(y_hat, y_target)
+    #     return loss
+
     def forward_with_target(self, x: Tensor, y: Tensor) -> Tensor:
         if x.shape[0] > self.max_len:
             print(f"WARNING: truncating input sequence to length {self.max_len}", file=sys.stderr)
@@ -157,24 +163,18 @@ class NeuralCorrector(pl.LightningModule):
             y = y[:(self.max_len - 1), :]
         batch_size = x.shape[1]
         device = self.device
-        # get padding masks
-        x_padding_mask = torch.where(x == INT_EMPTY, True, False)
-        y_padding_mask = torch.where(y == INT_EMPTY, True, False)
         # convert any INT_EMPTY to the actual padding index
-        x[x_padding_mask] = self.pad_index
-        y[y_padding_mask] = self.pad_index
+        x = torch.where(x == INT_EMPTY, self.pad_index, x)
+        y = torch.where(y == INT_EMPTY, self.pad_index, y)
         # stick a "start token" at the beginning of the target sequence
         y_in = torch.cat([torch.full((1, batch_size), self.bookend_index, device=device), y], dim=0)
-        # make padding masks
-        x_padding_mask = torch.permute(x_padding_mask, (1, 0))  # also permute since that's what torch wants
-        y_padding_mask = torch.permute(torch.cat([torch.zeros((1, batch_size), device=device).bool(), y_padding_mask], dim=0), (1, 0))
         # turn indices into embeddings
         x = self.positional_encoding(self.embedding_src(x.detach()))  # detach is so we don't need to back-prop through the data prep
         y_in = self.positional_encoding(self.embedding_tgt(y_in.detach()))
         # make a mask so it can't cheat when learning how to sequentially generate
         y_mask = nn.Transformer.generate_square_subsequent_mask(y_in.shape[0]).to(device)
         # pass the sequences through the main part of the model
-        y_hat = self.transformer(x, y_in, tgt_mask=y_mask, src_key_padding_mask=x_padding_mask, tgt_key_padding_mask=y_padding_mask)
+        y_hat = self.transformer(x, y_in, tgt_mask=y_mask)
         y_hat = self.linear_stack(y_hat)
         # add a bookend token to the end of each sequence in y, so the loss is teaching it to end with a bookend
         y_target = torch.cat([y, torch.full((1, batch_size), self.pad_index, device=device)], dim=0)
@@ -189,7 +189,7 @@ class NeuralCorrector(pl.LightningModule):
         y_hat = torch.permute(y_hat, (1, 2, 0))
         y_target = torch.permute(y_target, (1, 0))
         # get the loss
-        loss = self.criterion(y_hat, y_target)
+        loss = self.cross_entropy_loss(y_hat, y_target)
         return loss
 
     def training_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int) -> Tensor:
