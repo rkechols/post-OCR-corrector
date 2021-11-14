@@ -28,7 +28,7 @@ def train_mini(config, data_dir: str,
         callbacks=[
             TuneReportCallback({"loss": "ptl/val_loss"}, on="validation_end")
         ],
-        gradient_clip_val=0.25,
+        gradient_clip_val=1.0,
         gpus=ceil(num_gpus),  # if fractional GPUs passed in, convert to int
         progress_bar_refresh_rate=0,
         max_epochs=1,
