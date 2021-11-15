@@ -6,6 +6,7 @@ from typing import List, Tuple
 
 import pytorch_lightning as pl
 import torch
+from pytorch_lightning.core.decorators import auto_move_data
 from torch import nn, Tensor
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
@@ -65,6 +66,7 @@ class NeuralCorrector(pl.LightningModule):
         self.lr = lr
         self.batch_size = batch_size
 
+    @auto_move_data
     def forward(self, x: Tensor) -> Tensor:
         if x.shape[0] > self.max_len:
             print(f"WARNING: truncating input sequence to length {self.max_len}", file=sys.stderr)
@@ -155,6 +157,7 @@ class NeuralCorrector(pl.LightningModule):
     #     loss = self.nll_loss(y_hat, y_target)
     #     return loss
 
+    @auto_move_data
     def forward_with_target(self, x: Tensor, y: Tensor) -> Tensor:
         if x.shape[0] > self.max_len:
             print(f"WARNING: truncating input sequence to length {self.max_len}", file=sys.stderr)
@@ -203,6 +206,10 @@ class NeuralCorrector(pl.LightningModule):
         self.log("ptl/val_loss", loss)
         return loss
 
+    def configure_optimizers(self) -> Optimizer:
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        return optimizer
+
     def train_dataloader(self) -> DataLoader:
         dataset_train = CorrectorDataset(self.data_dir, split="train", tensors_out=True)
         return DataLoader(dataset_train, shuffle=True, batch_size=self.batch_size, num_workers=self.cpus, collate_fn=collate_sequences)
@@ -214,10 +221,6 @@ class NeuralCorrector(pl.LightningModule):
     def test_dataloader(self) -> DataLoader:
         dataset_test = CorrectorDataset(self.data_dir, split="test", tensors_out=True)
         return DataLoader(dataset_test, shuffle=False, batch_size=self.batch_size, num_workers=self.cpus, collate_fn=collate_sequences)
-
-    def configure_optimizers(self) -> Optimizer:
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        return optimizer
 
 
 if __name__ == "__main__":
