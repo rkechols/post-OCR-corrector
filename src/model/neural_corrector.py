@@ -213,7 +213,7 @@ class NeuralCorrector(pl.LightningModule):
 
     def val_dataloader(self) -> DataLoader:
         dataset_val = CorrectorDataset(self.data_dir, split="validation", tensors_out=True)
-        return DataLoader(dataset_val, shuffle=True, batch_size=self.batch_size, num_workers=self.cpus, collate_fn=collate_sequences)
+        return DataLoader(dataset_val, shuffle=False, batch_size=self.batch_size, num_workers=self.cpus, collate_fn=collate_sequences)
 
     def test_dataloader(self) -> DataLoader:
         dataset_test = CorrectorDataset(self.data_dir, split="test", tensors_out=True)
