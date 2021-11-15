@@ -6,7 +6,6 @@ from typing import List, Tuple
 
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.core.decorators import auto_move_data
 from torch import nn, Tensor
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
@@ -66,7 +65,6 @@ class NeuralCorrector(pl.LightningModule):
         self.lr = lr
         self.batch_size = batch_size
 
-    @auto_move_data
     def forward(self, x: Tensor) -> Tensor:
         if x.shape[0] > self.max_len:
             print(f"WARNING: truncating input sequence to length {self.max_len}", file=sys.stderr)
@@ -157,7 +155,6 @@ class NeuralCorrector(pl.LightningModule):
     #     loss = self.nll_loss(y_hat, y_target)
     #     return loss
 
-    @auto_move_data
     def forward_with_target(self, x: Tensor, y: Tensor) -> Tensor:
         if x.shape[0] > self.max_len:
             print(f"WARNING: truncating input sequence to length {self.max_len}", file=sys.stderr)
