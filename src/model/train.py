@@ -27,27 +27,40 @@ def load_hparams(model_dir: str) -> Dict:
     return hparams
 
 
-def set_batch_size(model: NeuralCorrector, num_gpus: int):
+def set_batch_size(model: NeuralCorrector, model_dir: str, num_gpus: int):
     print("finding batch size...")
     trainer = pl.Trainer(
         checkpoint_callback=False,
-        auto_scale_batch_size="binsearch",
+        default_root_dir=model_dir,
         gpus=num_gpus,
-        auto_select_gpus=True
+        auto_select_gpus=True,
+        num_sanity_val_steps=0,
+        auto_scale_batch_size="binsearch"
     )
-    trainer.tune(model)
+    trainer.tune(
+        model,
+        scale_batch_size_kwargs={"steps_per_trial": 20}  # make it more likely to hit a full-length sequence
+    )
     print(f"\nselected batch size: {model.batch_size}\n")
 
 
-def set_learning_rate(model: NeuralCorrector, num_gpus: int):
+def set_learning_rate(model: NeuralCorrector, model_dir: str, num_gpus: int):
     print("finding learning rate...")
     trainer = pl.Trainer(
         checkpoint_callback=False,
-        auto_lr_find=True,
+        default_root_dir=model_dir,
         gpus=num_gpus,
-        auto_select_gpus=True
+        auto_select_gpus=True,
+        num_sanity_val_steps=0,
+        auto_lr_find=True,
     )
-    trainer.tune(model)
+    trainer.tune(
+        model,
+        lr_find_kwargs={
+            "min_lr": 1e-6,
+            "max_lr": 1e-2
+        }
+    )
     print(f"\nselected learning rate: {model.lr}\n")
 
 
@@ -56,10 +69,9 @@ def train(data_dir: str, model_dir: str, num_cpus: int, num_gpus: int, checkpoin
     model = NeuralCorrector(data_dir, num_cpus, **hparams)
 
     if "batch_size" not in hparams:
-        set_batch_size(model, num_gpus)
+        set_batch_size(model, model_dir, num_gpus)
     if "lr" not in hparams:
-        set_learning_rate(model, num_gpus)
-
+        set_learning_rate(model, model_dir, num_gpus)
     log_dir = os.path.abspath(os.path.join(model_dir, TENSORBOARD_DIR_NAME))
     checkpoint_dir = os.path.abspath(os.path.join(model_dir, CHECKPOINT_DIR_NAME))
 
@@ -84,7 +96,6 @@ def train(data_dir: str, model_dir: str, num_cpus: int, num_gpus: int, checkpoin
                 divergence_threshold=6.0  # random answers give about 7.2, and a small amount of training quickly gets it to around 1.5
             )
         ],
-        gradient_clip_val=hparams["gradient_clip_val"],
         gpus=num_gpus,
         auto_select_gpus=True,
         max_time="00:23:59:59",  # "DD:HH:MM:SS" format
