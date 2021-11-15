@@ -28,7 +28,6 @@ def train_mini(config, data_dir: str,
         callbacks=[
             TuneReportCallback({"loss": "ptl/val_loss"}, on="validation_end")
         ],
-        gradient_clip_val=1.0,
         gpus=ceil(num_gpus),  # if fractional GPUs passed in, convert to int
         progress_bar_refresh_rate=0,
         max_epochs=1,
@@ -96,7 +95,7 @@ if __name__ == "__main__":
         config=search_space,
         num_samples=n_total,
         scheduler=ASHAScheduler(
-            time_attr="training_iteration",  # TODO: is this the same as # of batches? or is it really what's shown in the CLIReporter?
+            time_attr="training_iteration",  # seems to actually end up being number of validation steps...?
             max_t=50,
             grace_period=5,
             reduction_factor=2
