@@ -26,7 +26,8 @@ class NeuralCorrector(pl.LightningModule):
                  layer_norm_eps: float = 2e-5,
                  label_smoothing: float = 0.0,
                  lr: float = 3e-4,
-                 batch_size: int = 4):
+                 batch_size: int = 4,
+                 **kwargs):  # so it doesn't complain if it gets extra named arguments
         super().__init__()
         self.data_dir = data_dir
         self.alphabet = get_alphabet(data_dir)
@@ -204,11 +205,15 @@ class NeuralCorrector(pl.LightningModule):
 
     def train_dataloader(self) -> DataLoader:
         dataset_train = CorrectorDataset(self.data_dir, split="train", tensors_out=True)
-        return DataLoader(dataset_train, batch_size=self.batch_size, num_workers=self.cpus, collate_fn=collate_sequences)
+        return DataLoader(dataset_train, shuffle=True, batch_size=self.batch_size, num_workers=self.cpus, collate_fn=collate_sequences)
 
     def val_dataloader(self) -> DataLoader:
         dataset_val = CorrectorDataset(self.data_dir, split="validation", tensors_out=True)
-        return DataLoader(dataset_val, batch_size=self.batch_size, num_workers=self.cpus, collate_fn=collate_sequences)
+        return DataLoader(dataset_val, shuffle=True, batch_size=self.batch_size, num_workers=self.cpus, collate_fn=collate_sequences)
+
+    def test_dataloader(self) -> DataLoader:
+        dataset_test = CorrectorDataset(self.data_dir, split="test", tensors_out=True)
+        return DataLoader(dataset_test, shuffle=False, batch_size=self.batch_size, num_workers=self.cpus, collate_fn=collate_sequences)
 
     def configure_optimizers(self) -> Optimizer:
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
