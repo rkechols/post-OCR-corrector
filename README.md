@@ -72,6 +72,12 @@ python my_script.py -h
 
 ### 3. Train and Evaluate Neural Model
 
-1. Find Hyperparameters: 
+1. Find Hyperparameters: `src/model/tune_hyperparameters.py`  
+    Run a search across combinations of hyperparameters to find a good setup before going all-in.  
+    Save the best hyperparameter configuration to a `hyperparameters.json` file to be loaded later.
+
+2. Train the Model: `src/model/train.py`  
+    Initialize a model with the hyperparameters saved in `hyperparameters.json` file, and train the model. Save tensorboard logs and checkpoints while training.  
+    Note that batch size and learning rate are automatically selected in this script, not in `tune_hyperparameters.py`
 
 **TODO**
