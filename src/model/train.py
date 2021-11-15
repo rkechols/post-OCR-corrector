@@ -30,6 +30,7 @@ def load_hparams(model_dir: str) -> Dict:
 def set_batch_size(model: NeuralCorrector, num_gpus: int):
     print("finding batch size...")
     trainer = pl.Trainer(
+        checkpoint_callback=False,
         auto_scale_batch_size="binsearch",
         gpus=num_gpus,
         auto_select_gpus=True
@@ -41,6 +42,7 @@ def set_batch_size(model: NeuralCorrector, num_gpus: int):
 def set_learning_rate(model: NeuralCorrector, num_gpus: int):
     print("finding learning rate...")
     trainer = pl.Trainer(
+        checkpoint_callback=False,
         auto_lr_find=True,
         gpus=num_gpus,
         auto_select_gpus=True
