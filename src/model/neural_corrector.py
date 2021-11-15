@@ -18,12 +18,12 @@ from util.data_functions import collate_sequences, collate_single_column, get_al
 
 class NeuralCorrector(pl.LightningModule):
     def __init__(self, data_dir: str, cpus: int = None, max_len: int = 512,
-                 d_model: int = 512,
-                 n_head: int = 8,
-                 n_layers: int = 6,
-                 d_linear: int = 2048,
+                 d_model: int = 256,
+                 n_head: int = 4,
+                 n_layers: int = 4,
+                 d_linear: int = 256,
                  dropout: float = 0.1,
-                 layer_norm_eps: float = 1e-5,
+                 layer_norm_eps: float = 2e-5,
                  label_smoothing: float = 0.0,
                  lr: float = 3e-4,
                  batch_size: int = 4):

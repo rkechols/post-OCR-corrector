@@ -73,11 +73,11 @@ if __name__ == "__main__":
     search_space = {
         "d_model": tune.choice([256, 512]),
         "n_head": tune.choice([4, 8]),
-        "n_layers": tune.choice(list(range(4, 7))),
-        "d_linear": tune.choice([256, 512, 1024, 2048]),
-        "dropout": tune.choice([0.0, 0.05, 0.1, 0.3]),
-        "layer_norm_eps": tune.loguniform(1e-6, 1e-4),
-        "label_smoothing": tune.choice([0.0, 0.05, 0.1]),
+        # "n_layers": tune.choice(list(range(4, 7))),  # 4 looks like the best
+        "d_linear": tune.choice([256, 512, 1024]),  # tune.choice([256, 512, 1024, 2048]),
+        "dropout": tune.choice([0.05, 0.1]),  # tune.choice([0.0, 0.05, 0.1, 0.3]),
+        "layer_norm_eps": tune.uniform(0.5e-5, 2.5e-5),  # tune.loguniform(1e-6, 1e-4),
+        # "label_smoothing": tune.choice([0.0, 0.05, 0.1]),  # didn't do well with any
     }
 
     analysis = tune.run(
