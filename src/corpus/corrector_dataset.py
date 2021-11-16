@@ -7,7 +7,7 @@ from typing import Literal, Tuple
 import numpy as np
 from torch.utils.data import Dataset
 
-from corpus import ALL_CHARS_FILE_NAME, CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, SPLIT_FILE_NAME
+from corpus import CORPUS_MESSY_FILE_NAME, CORPUS_PLAIN_FILE_NAME, SPLIT_FILE_NAME
 from corpus.make_split_csv import BYTE_INDEX_CLEAN_STR, BYTE_INDEX_MESSY_STR, SPLIT_CSV_HEADER, SPLIT_NAMES, SPLIT_STR
 from util import DEFAULT_ENCODING
 from util.data_functions import get_alphabet, get_line, text_to_tensor

@@ -12,7 +12,7 @@ import ray
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from corpus import CORPUS_PLAIN_FILE_NAME, GOOD_CHARS_FILE_NAME, SPLIT_FILE_NAME
+from corpus import CORPUS_PLAIN_FILE_NAME, SPLIT_FILE_NAME
 from corpus.corrector_dataset import CorrectorDataset
 from corpus.make_split_csv import BYTE_INDEX_CLEAN_STR, SPLIT_CSV_HEADER, SPLIT_STR
 from util import DEFAULT_ENCODING
