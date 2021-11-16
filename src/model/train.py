@@ -15,9 +15,6 @@ from model.neural_corrector import NeuralCorrector
 from util import DEFAULT_ENCODING
 
 
-seed_everything(42, workers=True)  # reproducibility
-
-
 CUDA_COUNT = torch.cuda.device_count()
 
 
@@ -65,8 +62,11 @@ def set_learning_rate(model: NeuralCorrector, model_dir: str, num_gpus: int):
 
 
 def train(data_dir: str, model_dir: str, num_cpus: int, num_gpus: int, checkpoint: str = None):
+    seed_everything(42, workers=True)  # reproducibility
+
     hparams = load_hparams(model_dir)
-    model = NeuralCorrector(data_dir, num_cpus, **hparams)
+    print("loaded hparams:", hparams)
+    model = NeuralCorrector(data_dir, num_cpus, **hparams, show_warnings=False)
 
     if "batch_size" not in hparams:
         set_batch_size(model, model_dir, num_gpus)
@@ -98,8 +98,9 @@ def train(data_dir: str, model_dir: str, num_cpus: int, num_gpus: int, checkpoin
         ],
         gpus=num_gpus,
         auto_select_gpus=True,
+        max_epochs=1,  # since a single epoch takes ~380 hours...
         max_time="00:23:59:59",  # "DD:HH:MM:SS" format
-        limit_val_batches=50,
+        limit_val_batches=500,
         val_check_interval=500,
         num_sanity_val_steps=1,
         resume_from_checkpoint=checkpoint,

@@ -27,6 +27,7 @@ class NeuralCorrector(pl.LightningModule):
                  label_smoothing: float = 0.0,
                  lr: float = 3e-4,
                  batch_size: int = 4,
+                 show_warnings: bool = True,
                  **kwargs):  # so it doesn't complain if it gets extra named arguments
         super().__init__()
         self.data_dir = data_dir
@@ -64,10 +65,12 @@ class NeuralCorrector(pl.LightningModule):
         self.cross_entropy_loss = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
         self.lr = lr
         self.batch_size = batch_size
+        self.show_warnings = show_warnings
 
     def forward(self, x: Tensor) -> Tensor:
         if x.shape[0] > self.max_len:
-            print(f"WARNING: truncating input sequence to length {self.max_len}", file=sys.stderr)
+            if self.show_warnings:
+                print(f"WARNING: truncating input sequence to length {self.max_len}", file=sys.stderr)
             x = x[:self.max_len, :]
         in_length, batch_size = x.shape
         device = self.device
@@ -157,10 +160,12 @@ class NeuralCorrector(pl.LightningModule):
 
     def forward_with_target(self, x: Tensor, y: Tensor) -> Tensor:
         if x.shape[0] > self.max_len:
-            print(f"WARNING: truncating input sequence to length {self.max_len}", file=sys.stderr)
+            if self.show_warnings:
+                print(f"WARNING: truncating input sequence to length {self.max_len}", file=sys.stderr)
             x = x[:self.max_len, :]
         if y.shape[0] >= self.max_len:
-            print(f"WARNING: truncating target sequence to length {self.max_len - 1}", file=sys.stderr)
+            if self.show_warnings:
+                print(f"WARNING: truncating target sequence to length {self.max_len - 1}", file=sys.stderr)
             y = y[:(self.max_len - 1), :]
         batch_size = x.shape[1]
         device = self.device
