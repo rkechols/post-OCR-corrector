@@ -1,10 +1,12 @@
+import json
 import os
-from typing import Iterable, List, Set, Tuple
+from typing import Dict, Iterable, List, Set, Tuple
 
 import torch
 from torch import Tensor
 
 from corpus import ALL_CHARS_FILE_NAME, GOOD_CHARS_FILE_NAME
+from model import HYPERPARAMS_FILE_NAME
 from util import DEFAULT_ENCODING, INT_EMPTY
 
 
@@ -72,3 +74,9 @@ def get_whitespace_indices(data_dir: str) -> Set[int]:
         if char.isspace():
             to_return.add(index)
     return to_return
+
+
+def load_hparams(model_dir: str) -> Dict:
+    with open(os.path.join(model_dir, HYPERPARAMS_FILE_NAME), "r", encoding=DEFAULT_ENCODING) as hparams_file:
+        hparams = json.loads(hparams_file.read())
+    return hparams

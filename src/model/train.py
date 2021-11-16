@@ -1,8 +1,6 @@
 import argparse
-import json
 import os
 import sys
-from typing import Dict
 
 import pytorch_lightning as pl
 import torch
@@ -10,18 +8,12 @@ from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
-from model import CHECKPOINT_DIR_NAME, HYPERPARAMS_FILE_NAME, TENSORBOARD_DIR_NAME
+from model import CHECKPOINT_DIR_NAME, TENSORBOARD_DIR_NAME
 from model.neural_corrector import NeuralCorrector
-from util import DEFAULT_ENCODING
+from util.data_functions import load_hparams
 
 
 CUDA_COUNT = torch.cuda.device_count()
-
-
-def load_hparams(model_dir: str) -> Dict:
-    with open(os.path.join(model_dir, HYPERPARAMS_FILE_NAME), "r", encoding=DEFAULT_ENCODING) as hparams_file:
-        hparams = json.loads(hparams_file.read())
-    return hparams
 
 
 def set_batch_size(model: NeuralCorrector, model_dir: str, num_gpus: int):
