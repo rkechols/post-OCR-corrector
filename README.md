@@ -54,7 +54,7 @@ python my_script.py -h
     `good_chars.txt` that contains the "standard" characters used in the dataset. This should be a subset of the
     characters from `all_chars.txt`.
 
-4. Create a Messy Corpus: `src/corpus/make_messy_dataset.py`:  
+4. Create a Messy Corpus: `src/corpus/make_messy_dataset.py`  
     Read the plain-text corpus and create a "messy"/"mutilated" version by randomly editing some characters. Note that
     this depends on the `good_chars.txt` file from the previous step.
 
