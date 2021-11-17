@@ -17,7 +17,7 @@ from corpus.corrector_dataset import CorrectorDataset
 from corpus.make_split_csv import BYTE_INDEX_CLEAN_STR, SPLIT_CSV_HEADER, SPLIT_STR
 from util import DEFAULT_ENCODING
 from util.data_functions import get_alphabet, get_line
-from util.edit_distance import edit_distance
+from util.edit_distance import edit_distance, normalized_edit_distance
 
 
 WHITESPACE_RE = re.compile(r"\s")
@@ -120,8 +120,7 @@ class DictionaryCorrector:
                 if text_out == text_clean:  # nailed it
                     n_perfect += 1
                 else:  # measure how far off it was
-                    distance = edit_distance(text_out, text_clean)
-                    distance_norm = distance / len(text_clean)
+                    distance_norm = normalized_edit_distance(text_out, text_clean)
                     distance_total += distance_norm
         else:  # yes doing multiple processes
             model_ref = ray.put(self)  # load 'self' (the model) into shared memory
@@ -149,8 +148,7 @@ class DictionaryCorrector:
                         if text_out == text_clean:  # nailed it
                             n_perfect += 1
                         else:  # measure how far off it was
-                            distance = edit_distance(text_out, text_clean)
-                            distance_norm = distance / len(text_clean)
+                            distance_norm = normalized_edit_distance(text_out, text_clean)
                             distance_total += distance_norm
                         progress.update()
         avg_distance = distance_total / n

@@ -56,3 +56,8 @@ def edit_distance(s1: str, s2: str) -> int:
             scores[i, j] = min(score_options)
 
     return scores[-1, -1]
+
+
+def normalized_edit_distance(incorrect: str, correct: str) -> float:
+    plain_edit_distance = edit_distance(incorrect, correct)
+    return plain_edit_distance / len(correct)
