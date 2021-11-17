@@ -63,9 +63,12 @@ python my_script.py -h
     the corresponding line of the messy corpus. Also decides and records which dataset split (train, validation, test)
     the line belongs to.
 
-### 2. Train and Evaluate Baseline Model
+### 2. Train and Evaluate Baseline Models
 
-1. Train a Baseline: `src/baselines/dictionary_corrector.py`  
+1. Evaluate Control: `src/baselines/null_corrector.py`  
+    As a control for other tests, evaluate using a "null corrector", i.e. with no corrections.
+
+2. Train a Baseline: `src/baselines/dictionary_corrector.py`  
     Train a basic dictionary-based corrector that corrects unknown words by replacing them with the nearest known word
     ("nearest" measured by Damerau-Levenshtein distance). Because this algorithm for correcting sentences is very slow
     and scales with the vocabulary size, evaluation can take a very long time.
