@@ -27,9 +27,9 @@ def evaluate(dataset: CorrectorDataset, n_cpus: int = 1):
                 generator = (dataset[i] for i in range(n))
                 with tqdm(total=n) as progress:
                     for score in pool.imap_unordered(
-                            norm_edit_distance_mp,
-                            generator,
-                            chunksize=250
+                        norm_edit_distance_mp,
+                        generator,
+                        chunksize=250
                     ):
                         all_scores.append(score)
                         progress.update()
