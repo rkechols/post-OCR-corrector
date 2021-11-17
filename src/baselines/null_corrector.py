@@ -1,10 +1,9 @@
 import argparse
-import os
 import multiprocessing as mp
+import os
 from typing import Tuple
 
 from tqdm import tqdm
-from math import ceil
 
 from corpus.corrector_dataset import CorrectorDataset
 from util.edit_distance import normalized_edit_distance
@@ -30,12 +29,12 @@ def evaluate(dataset: CorrectorDataset, n_cpus: int = 1):
                     for score in pool.imap_unordered(
                             norm_edit_distance_mp,
                             generator,
-                            chunksize=50
+                            chunksize=250
                     ):
                         all_scores.append(score)
                         progress.update()
     except KeyboardInterrupt:
-        print("KEYBOARD INTERRUPT - terminating evaluation")
+        print("\nKEYBOARD INTERRUPT - terminating evaluation\n")
     # give results
     n = len(all_scores)  # maybe we didn't do all of them
     avg_score = sum(all_scores) / n
