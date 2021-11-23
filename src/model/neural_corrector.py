@@ -17,7 +17,7 @@ from util.data_functions import collate_sequences, collate_single_column, get_al
 
 
 class NeuralCorrector(pl.LightningModule):
-    def __init__(self, data_dir: str, cpus: int = None, max_len: int = 512,
+    def __init__(self, data_dir: str, alphabet: str, cpus: int = None, max_len: int = 512,
                  d_model: int = 256,
                  n_head: int = 4,
                  n_layers: int = 4,
@@ -30,8 +30,9 @@ class NeuralCorrector(pl.LightningModule):
                  show_warnings: bool = True,
                  **kwargs):  # so it doesn't complain if it gets extra named arguments
         super().__init__()
+        self.save_hyperparameters(ignore="cpus")
         self.data_dir = data_dir
-        self.alphabet = get_alphabet(data_dir)
+        self.alphabet = alphabet
         alphabet_size = len(self.alphabet)
         # unk_index MUST be the first one after the valid alphabet indices because of how util.data_functions.text_to_tensor works
         self.unk_index = alphabet_size
@@ -252,7 +253,8 @@ if __name__ == "__main__":
     if cpus_ == 1:
         cpus_ = 0  # DataLoader expects 0 if we're not doing extra workers
 
-    model = NeuralCorrector(corpus_dir, cpus_)
+    alphabet_ = get_alphabet(corpus_dir)
+    model = NeuralCorrector(corpus_dir, alphabet_, cpus_)
     model.to(device_)
     model.eval()
 

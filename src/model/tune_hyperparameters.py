@@ -22,7 +22,8 @@ def train_mini(config, data_dir: str,
                num_cpus: float = 1, num_gpus: float = 0,
                checkpoint_dir: str = None):
     tune.utils.wait_for_gpu(target_util=0.1, delay_s=2)
-    model = NeuralCorrector(data_dir, ceil(num_cpus), **config)
+    alphabet = get_alphabet(data_dir)
+    model = NeuralCorrector(data_dir, alphabet, ceil(num_cpus), **config)
     trainer = pl.Trainer(
         logger=TensorBoardLogger(save_dir=tune.get_trial_dir(), name="", version="."),
         callbacks=[

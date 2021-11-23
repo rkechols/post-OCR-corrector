@@ -10,7 +10,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 
 from model import CHECKPOINT_DIR_NAME, TENSORBOARD_DIR_NAME
 from model.neural_corrector import NeuralCorrector
-from util.data_functions import load_hparams
+from util.data_functions import get_alphabet, load_hparams
 
 
 CUDA_COUNT = torch.cuda.device_count()
@@ -58,7 +58,8 @@ def train(data_dir: str, model_dir: str, num_cpus: int, num_gpus: int, checkpoin
 
     hparams = load_hparams(model_dir)
     print("loaded hparams:", hparams)
-    model = NeuralCorrector(data_dir, num_cpus, **hparams, show_warnings=False)
+    alphabet = get_alphabet(data_dir)
+    model = NeuralCorrector(data_dir, alphabet, num_cpus, **hparams, show_warnings=False)
 
     if "batch_size" not in hparams:
         set_batch_size(model, model_dir, num_gpus)
