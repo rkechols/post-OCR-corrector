@@ -40,8 +40,10 @@ def evaluate(data_dir: str, model_path: str, num_cpus: int, device: torch.device
                     for y, y_hat in zip(y_batch, y_hat_batch):
                         if y == y_hat:  # shortcut
                             scores_out.append(0)
+                        elif len(y) == 0:
+                            print("y was length 0; skipping", file=sys.stderr)
                         else:
-                            scores_out.append(normalized_edit_distance(y, y_hat, banded=False))
+                            scores_out.append(normalized_edit_distance(y_hat, y, banded=False))
                         progress.update()
     except KeyboardInterrupt:
         print("\nKEYBOARD INTERRUPT - terminating evaluation\n")
