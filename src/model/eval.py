@@ -1,4 +1,5 @@
 import argparse
+import csv
 import os
 import sys
 
@@ -9,7 +10,11 @@ from tqdm import tqdm
 
 from corpus.corrector_dataset import CorrectorDataset
 from model.neural_corrector import NeuralCorrector
+from util import DEFAULT_ENCODING
 from util.edit_distance import normalized_edit_distance
+
+
+OUT_FILE_NAME = "neural_examples.csv"
 
 
 def evaluate(data_dir: str, model_path: str, num_cpus: int, device: torch.device, test: bool = False):
@@ -29,22 +34,31 @@ def evaluate(data_dir: str, model_path: str, num_cpus: int, device: torch.device
     else:
         dataset = CorrectorDataset(data_dir, split="validation")
     data_loader = DataLoader(dataset, batch_size=model.batch_size, num_workers=num_cpus)
-    # make a place to save results
+    # make places to save results
     scores_out = list()
+    out_file_path = os.path.join(data_dir, OUT_FILE_NAME)
+    with open(out_file_path, "w", encoding=DEFAULT_ENCODING, newline="") as out_file:
+        writer = csv.writer(out_file)
+        writer.writerow(["text_in", "text_out", "text_correct", "edit_distance"])
     # run data through until interrupted or completed
     try:
         with torch.no_grad():
             with tqdm(total=len(dataset)) as progress:
                 for x_batch, y_batch in data_loader:
                     y_hat_batch = model.correct(x_batch)
-                    for y, y_hat in zip(y_batch, y_hat_batch):
-                        if y == y_hat:  # shortcut
-                            scores_out.append(0)
-                        elif len(y) == 0:
-                            print("y was length 0; skipping", file=sys.stderr)
-                        else:
-                            scores_out.append(normalized_edit_distance(y_hat, y, banded=False))
-                        progress.update()
+                    with open(out_file_path, "a", encoding=DEFAULT_ENCODING, newline="") as out_file:
+                        writer = csv.writer(out_file)
+                        for x, y, y_hat in zip(x_batch, y_batch, y_hat_batch):
+                            if len(y) == 0:
+                                print("y was length 0; skipping", file=sys.stderr)
+                            else:
+                                if y == y_hat:  # shortcut
+                                    this_score = 0
+                                else:
+                                    this_score = normalized_edit_distance(y_hat, y, banded=False)
+                                scores_out.append(this_score)
+                                writer.writerow([x, y_hat, y, f"{this_score}:.4f"])
+                            progress.update()
     except KeyboardInterrupt:
         print("\nKEYBOARD INTERRUPT - terminating evaluation\n")
     n = len(scores_out)

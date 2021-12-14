@@ -1,4 +1,5 @@
 GPUtil==1.4.0
+matplotlib==3.4.3
 numpy==1.21.4
 pytorch-lightning==1.4.9
 ray[default]==1.8.0
