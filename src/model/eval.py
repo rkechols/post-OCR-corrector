@@ -57,7 +57,7 @@ def evaluate(data_dir: str, model_path: str, num_cpus: int, device: torch.device
                                 else:
                                     this_score = normalized_edit_distance(y_hat, y, banded=False)
                                 scores_out.append(this_score)
-                                writer.writerow([x, y_hat, y, f"{this_score}:.4f"])
+                                writer.writerow([x, y_hat, y, f"{this_score:.4f}"])
                             progress.update()
     except KeyboardInterrupt:
         print("\nKEYBOARD INTERRUPT - terminating evaluation\n")
